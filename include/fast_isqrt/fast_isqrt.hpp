@@ -165,64 +165,6 @@ template <uint64_t Mod>
     return (r * r) == n;
 }
 
-// C++26: コンパイル時に Modulo M の平方余りビットマスクを自動生成
-template <uint64_t Mod>
-[[nodiscard]] constexpr uint64_t generate_sq_mod_mask() noexcept {
-    static_assert(Mod <= 64, "Mod must be <= 64 for 64-bit mask");
-    uint64_t mask = 0;
-    for (uint64_t i = 0; i < Mod; ++i) {
-        mask |= (1ULL << ((i * i) % Mod));
-    }
-    return mask;
-}
-
-// 64-bit 平方判定
-[[nodiscard]] inline bool is_perfect_square64(uint64_t n) noexcept {
-    // Mod 64 フィルター (11/64 のみ通過 => 82.8% を即座に reject)
-    constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    
-    if ((sq_mod64_mask & (1ULL << (n & 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    // Mod 63 フィルター (n % 63 の余りチェック)
-    // 63 剰余も下位 6bit 判定同様にルックアップテーブルで弾く場合
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    // フィルタを抜けた約 4.3% の候補のみ isqrt64_with_sq を実行
-    auto [r, sq] = isqrt64_with_sq(n);
-    return sq == n;
-}
-
-// 128-bit 平方判定
-[[nodiscard]] inline bool is_perfect_square128(uint128_t n) noexcept {
-    // 128-bit でも下位 64-bit の Mod 64 判定はそのまま成立する
-    constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    uint64_t n_lo = static_cast<uint64_t>(n);
-
-    if ((sq_mod64_mask & (1ULL << (n_lo & 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    // 64-bit 内に収まる場合は 64-bit 判定へ移譲
-    if (n <= UINT64_MAX) {
-        auto [r, sq] = isqrt64_with_sq(n_lo);
-        return sq == n_lo;
-    }
-
-    // 128-bit での最終検証
-    uint128_t r = isqrt128(n);
-    return (r * r) == n;
-}
-
 } // namespace fast_isqrt
 
 #endif // FAST_ISQRT_HPP
