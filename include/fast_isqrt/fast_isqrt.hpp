@@ -2,7 +2,6 @@
 #define FAST_ISQRT_HPP
 
 #include <cstdint>
-#include <cmath>
 
 #ifndef __SIZEOF_INT128__
 #error "fast_isqrt requires 128-bit integer support (__int128_t / __uint128_t) in Clang or GCC."
@@ -19,7 +18,7 @@ correct_isqrt64(uint64_t x) noexcept {
 
 [[nodiscard]] inline uint64_t isqrt64(uint64_t n) noexcept {
     const uint64_t x =
-        static_cast<uint64_t>(std::sqrt(static_cast<double>(n)));
+        static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
     const uint64_t remainder = n - x * x;
 
     // Unsigned underflow marks an overshoot in the top bit.
@@ -43,7 +42,7 @@ correct_isqrt64_with_sq(uint64_t x, uint64_t sq) noexcept {
 
 [[nodiscard]] inline IsqrtResult isqrt64_with_sq(uint64_t n) noexcept {
     const uint64_t x =
-        static_cast<uint64_t>(std::sqrt(static_cast<double>(n)));
+        static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
     const uint64_t sq = x * x;
 
     if ((n - sq) >> 63) [[unlikely]] {
@@ -52,8 +51,6 @@ correct_isqrt64_with_sq(uint64_t x, uint64_t sq) noexcept {
 
     return IsqrtResult{x, sq};
 }
-
-namespace detail {
 
 struct alignas(16) IsqrtRemainder {
     uint64_t root;
@@ -69,7 +66,7 @@ correct_isqrt64_with_remainder(uint64_t x, uint64_t remainder) noexcept {
 [[nodiscard]] static inline IsqrtRemainder
 isqrt64_with_remainder(uint64_t n) noexcept {
     const uint64_t x =
-        static_cast<uint64_t>(std::sqrt(static_cast<double>(n)));
+        static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
     const uint64_t remainder = n - x * x;
 
     if (remainder >> 63) [[unlikely]] {
@@ -78,8 +75,6 @@ isqrt64_with_remainder(uint64_t n) noexcept {
 
     return IsqrtRemainder{x, remainder};
 }
-
-} // namespace detail
 
 [[nodiscard]] inline uint128_t isqrt128(uint128_t n) noexcept {
     const uint64_t hi = static_cast<uint64_t>(n >> 64);
@@ -90,7 +85,7 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     const int a = __builtin_clzll(hi) >> 1;
     const uint128_t scaled_n = n << (a << 1);
     const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
-    auto [isqu, remainder] = detail::isqrt64_with_remainder(u);
+    const auto [isqu, remainder] = isqrt64_with_remainder(u);
 
     const uint64_t quotient =
         ((remainder << 31) | (static_cast<uint64_t>(scaled_n) >> 33)) /
@@ -107,7 +102,6 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     return x - static_cast<uint64_t>(final_remainder >> 127);
 }
 
-// C++26: コンパイル時に Modulo M の平方余りビットマスクを自動生成
 template <uint64_t Mod>
 [[nodiscard]] constexpr uint64_t generate_sq_mod_mask() noexcept {
     static_assert(Mod <= 64, "Mod must be <= 64 for 64-bit mask");
