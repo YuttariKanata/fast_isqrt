@@ -51,7 +51,7 @@ endif()
 
 # 3. ベンチマークのビルド設定
 if(BUILD_BENCHMARKS)
-    add_executable(bench_fast_isqrt benchmarks/bench.cpp)
+    add_executable(bench_fast_isqrt benchmarks/bench_CPUclock.cpp)
     target_link_libraries(bench_fast_isqrt PRIVATE fast_isqrt)
     
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
