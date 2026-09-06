@@ -78,13 +78,13 @@ int main() {
         }
 
         // ウォームアップ (キャッシュ・CPUクロックの安定化)
-        volatile uint128_t dummy = 0;
+        volatile uint64_t dummy = 0;
         for (int i = 0; i < 100000; ++i) {
             dummy += isqrt128(bench_data[i]);
         }
 
         // 本計測
-        volatile uint128_t sink = 0;
+        volatile uint64_t sink = 0;
         auto t_start = std::chrono::high_resolution_clock::now();
 
         for (int i = 0; i < SPEED_SAMPLES; ++i) {

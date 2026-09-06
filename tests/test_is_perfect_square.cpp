@@ -193,8 +193,8 @@ void test_random_perfect_square_neighbor(uint64_t seed, int num_squares, int64_t
 
         // 範囲内の全整数 n を検証
         for (uint128_t n = start_n; n <= end_n; ++n) {
-            uint128_t r = isqrt128(n);
-            bool expected = (r * r == n);
+            uint64_t r = isqrt128(n);
+            bool expected = (static_cast<uint128_t>(r) * r == n);
             
             // 64-bit / 128-bit それぞれの関数で判定
             bool actual64 = (n <= UINT64_MAX) ? is_perfect_square64(static_cast<uint64_t>(n)) : expected;

@@ -29,41 +29,41 @@ correct_isqrt64(uint64_t x) noexcept {
     return x;
 }
 
-struct alignas(16) IsqrtResult {
+struct alignas(16) IsqrtSquare64 {
     uint64_t root;
     uint64_t sq;
 };
 
-[[gnu::noinline, gnu::cold]] static IsqrtResult
-correct_isqrt64_with_sq(uint64_t x, uint64_t sq) noexcept {
+[[gnu::noinline, gnu::cold]] static IsqrtSquare64
+correct_isqrt64_with_square(uint64_t x, uint64_t sq) noexcept {
     sq -= (x << 1) - 1;
-    return IsqrtResult{x - 1, sq};
+    return IsqrtSquare64{x - 1, sq};
 }
 
-[[nodiscard]] inline IsqrtResult isqrt64_with_sq(uint64_t n) noexcept {
+[[nodiscard]] inline IsqrtSquare64 isqrt64_with_square(uint64_t n) noexcept {
     const uint64_t x =
         static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
     const uint64_t sq = x * x;
 
     if ((n - sq) >> 63) [[unlikely]] {
-        return correct_isqrt64_with_sq(x, sq);
+        return correct_isqrt64_with_square(x, sq);
     }
 
-    return IsqrtResult{x, sq};
+    return IsqrtSquare64{x, sq};
 }
 
-struct alignas(16) IsqrtRemainder {
+struct alignas(16) IsqrtRemainder64 {
     uint64_t root;
     uint64_t remainder;
 };
 
-[[gnu::noinline, gnu::cold]] static IsqrtRemainder
+[[gnu::noinline, gnu::cold]] static IsqrtRemainder64
 correct_isqrt64_with_remainder(uint64_t x, uint64_t remainder) noexcept {
     remainder += (x << 1) - 1;
-    return IsqrtRemainder{x - 1, remainder};
+    return IsqrtRemainder64{x - 1, remainder};
 }
 
-[[nodiscard]] static inline IsqrtRemainder
+[[nodiscard]] static inline IsqrtRemainder64
 isqrt64_with_remainder(uint64_t n) noexcept {
     const uint64_t x =
         static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
@@ -73,10 +73,10 @@ isqrt64_with_remainder(uint64_t n) noexcept {
         return correct_isqrt64_with_remainder(x, remainder);
     }
 
-    return IsqrtRemainder{x, remainder};
+    return IsqrtRemainder64{x, remainder};
 }
 
-[[nodiscard]] inline uint128_t isqrt128(uint128_t n) noexcept {
+[[nodiscard]] inline uint64_t isqrt128(uint128_t n) noexcept {
     const uint64_t hi = static_cast<uint64_t>(n >> 64);
     if (hi == 0) [[unlikely]] {
         return isqrt64(static_cast<uint64_t>(n));
@@ -93,13 +93,113 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
 
-    if (x < base) [[unlikely]] {
+    if (hi == UINT64_MAX) [[unlikely]] {
         return UINT64_MAX;
     }
 
     const uint128_t final_remainder =
         n - static_cast<uint128_t>(x) * x;
     return x - static_cast<uint64_t>(final_remainder >> 127);
+}
+
+struct alignas(16) IsqrtSquare128 {
+    uint64_t root;
+    uint128_t sq;
+};
+
+[[gnu::noinline, gnu::cold]] static IsqrtSquare128
+correct_isqrt128_with_square(uint64_t x, uint128_t sq) noexcept {
+    sq -= (static_cast<uint128_t>(x) << 1) - 1;
+    return IsqrtSquare128{x - 1, sq};
+}
+
+[[gnu::noinline, gnu::cold]] static IsqrtSquare128
+handle_max_isqrt128_with_square() noexcept {
+    constexpr uint64_t root = UINT64_MAX;
+    constexpr uint128_t sq = (static_cast<uint128_t>(UINT64_MAX) * UINT64_MAX);
+    return IsqrtSquare128{root, sq};
+}
+
+[[nodiscard]] inline IsqrtSquare128 isqrt128_with_square(uint128_t n) noexcept {
+    const uint64_t hi = static_cast<uint64_t>(n >> 64);
+    if (hi == 0) [[unlikely]] {
+        const auto [root, sq] = isqrt64_with_square(static_cast<uint64_t>(n));
+        return IsqrtSquare128{root, static_cast<uint128_t>(sq)};
+    }
+
+    const int a = __builtin_clzll(hi) >> 1;
+    const uint128_t scaled_n = n << (a << 1);
+    const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const auto [isqu, remainder] = isqrt64_with_remainder(u);
+
+    const uint64_t quotient =
+        ((remainder << 31) | (static_cast<uint64_t>(scaled_n) >> 33)) /
+        isqu;
+    const uint64_t base = isqu << (32 - a);
+    const uint64_t x = base + (quotient >> a);
+
+    if (hi == UINT64_MAX) [[unlikely]] {
+        return handle_max_isqrt128_with_square();
+    }
+
+    const uint128_t sq = static_cast<uint128_t>(x) * x;
+    const uint128_t final_remainder = n - sq;
+
+    if (final_remainder >> 127) [[unlikely]] {
+        return correct_isqrt128_with_square(x, sq);
+    }
+
+    return IsqrtSquare128{x, sq};
+}
+
+struct alignas(16) IsqrtRemainder128 {
+    uint64_t root;
+    uint128_t remainder;
+};
+
+[[gnu::noinline, gnu::cold]] static IsqrtRemainder128
+correct_isqrt128_with_remainder(uint64_t x, uint128_t remainder) noexcept {
+    remainder += (static_cast<uint128_t>(x) << 1) - 1;
+    return IsqrtRemainder128{x - 1, remainder};
+}
+
+[[gnu::noinline, gnu::cold]] static IsqrtRemainder128
+handle_max_isqrt128_with_remainder(uint128_t n) noexcept {
+    constexpr uint64_t root = UINT64_MAX;
+    constexpr uint128_t max_sq = (static_cast<uint128_t>(UINT64_MAX) * UINT64_MAX);
+    return IsqrtRemainder128{root, n - max_sq};
+}
+
+[[nodiscard]] inline IsqrtRemainder128 isqrt128_with_remainder(uint128_t n) noexcept {
+    const uint64_t hi = static_cast<uint64_t>(n >> 64);
+    if (hi == 0) [[unlikely]] {
+        const auto [root, rem] = isqrt64_with_remainder(static_cast<uint64_t>(n));
+        return IsqrtRemainder128{root, static_cast<uint128_t>(rem)};
+    }
+
+    const int a = __builtin_clzll(hi) >> 1;
+    const uint128_t scaled_n = n << (a << 1);
+    const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const auto [isqu, remainder] = isqrt64_with_remainder(u);
+
+    const uint64_t quotient =
+        ((remainder << 31) | (static_cast<uint64_t>(scaled_n) >> 33)) /
+        isqu;
+    const uint64_t base = isqu << (32 - a);
+    const uint64_t x = base + (quotient >> a);
+
+    if (hi == UINT64_MAX) [[unlikely]] {
+        return handle_max_isqrt128_with_remainder(n);
+    }
+
+    const uint128_t sq = static_cast<uint128_t>(x) * x;
+    const uint128_t final_remainder = n - sq;
+
+    if (final_remainder >> 127) [[unlikely]] {
+        return correct_isqrt128_with_remainder(x, final_remainder);
+    }
+
+    return IsqrtRemainder128{x, final_remainder};
 }
 
 template <uint64_t Mod>
@@ -119,7 +219,7 @@ template <uint64_t Mod>
         return false;
     }
 
-    const auto [r, sq] = isqrt64_with_sq(n);
+    const auto [r, sq] = isqrt64_with_square(n);
     return sq == n;
 }
 
@@ -135,12 +235,12 @@ template <uint64_t Mod>
     // 64-bit 内に収まる場合は 64-bit 判定へ移譲
     if (!(n >> 64)) {
         uint64_t n_lo = static_cast<uint64_t>(n);
-        auto [r, sq] = isqrt64_with_sq(n_lo);
+        auto [r, sq] = isqrt64_with_square(n_lo);
         return sq == n_lo;
     }
 
     // 128-bit での最終検証
-    uint128_t r = isqrt128(n);
+    uint128_t r = static_cast<uint128_t>(isqrt128(n));
     return (r * r) == n;
 }
 

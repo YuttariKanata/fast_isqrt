@@ -264,6 +264,7 @@ int main() {
         print_stats128("128-bit Squares Neighborhood Test", stats);
     }
 
+    // 各bit長 (20bits ~ 128bits) ランダムテスト
     {
         std::cout << "Bit,    Total_Calls,    Fallback_64,Main_Calls,     Guard, exact_hit,Overshoots,  Overshoot_Pct\n";
 
@@ -277,7 +278,6 @@ int main() {
 
             const uint64_t main_calls = stats.total_calls - stats.hi_zero_calls;
             double overshoot_pct = 0.0;
-            
             if (main_calls > 0) {
                 overshoot_pct = (double)stats.overshoots / main_calls * 100.0;
             }
@@ -293,6 +293,37 @@ int main() {
                                     stats.overshoots,
                                     overshoot_pct);
         }
+    }
+
+    // [UINT128_MAX - 100'000'000, UINT128_MAX] テスト
+    {
+        std::cout << "    Total_Calls,    Fallback_64,Main_Calls,     Guard, exact_hit,Overshoots,  Overshoot_Pct\n";
+
+        Isqrt128Stats stats;
+
+        const uint128_t MAX128 = (~((uint128_t)0)) - (((uint128_t)1)<<64);
+        const uint128_t RADIUS = 100'000'000;
+        uint128_t n = MAX128;
+        do {
+            tracked_isqrt128(n, stats);
+        } while (n-- != (MAX128-RADIUS));
+
+        const uint64_t main_calls = stats.total_calls - stats.hi_zero_calls;
+        double overshoot_pct = 0.0;
+        if (main_calls > 0) {
+            overshoot_pct = (double)stats.overshoots / main_calls * 100.0;
+        }
+
+        // CSV形式で1行ずつ結果を出力
+        std::cout << std::format("{:15d},{:15d},{:10d},{:10d},{:10d},{:10d},    {:10.5f}%\n",
+                                stats.total_calls,
+                                stats.hi_zero_calls,
+                                main_calls,
+                                stats.overflow_guard,
+                                stats.exact_hits,
+                                stats.overshoots,
+                                overshoot_pct);
+        
     }
 
     return 0;
