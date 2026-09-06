@@ -11,6 +11,18 @@ namespace fast_isqrt {
 
 using uint128_t = unsigned __int128;
 
+[[nodiscard]] static inline double sqrt_u64(uint64_t n) noexcept {
+    double x = static_cast<double>(n);
+    #if defined(__AVX__) && (defined(__x86_64__) || defined(__amd64__))
+        __asm__("vsqrtsd %0, %0, %0" : "+x"(x));
+    #elif defined(__SSE2__) && (defined(__x86_64__) || defined(__amd64__))
+        __asm__("sqrtsd %0, %0" : "+x"(x));
+    #else
+        x = __builtin_sqrt(x);
+    #endif
+    return x;
+}
+
 [[gnu::noinline, gnu::cold]] static uint64_t
 correct_isqrt64(uint64_t x) noexcept {
     return x - 1;
@@ -18,7 +30,7 @@ correct_isqrt64(uint64_t x) noexcept {
 
 [[nodiscard]] inline uint64_t isqrt64(uint64_t n) noexcept {
     const uint64_t x =
-        static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
+        static_cast<uint64_t>(sqrt_u64(n));
     const uint64_t remainder = n - x * x;
 
     // Unsigned underflow marks an overshoot in the top bit.
@@ -42,7 +54,7 @@ correct_isqrt64_with_sq(uint64_t x, uint64_t sq) noexcept {
 
 [[nodiscard]] inline IsqrtResult isqrt64_with_sq(uint64_t n) noexcept {
     const uint64_t x =
-        static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
+        static_cast<uint64_t>(sqrt_u64(n));
     const uint64_t sq = x * x;
 
     if ((n - sq) >> 63) [[unlikely]] {
@@ -66,7 +78,7 @@ correct_isqrt64_with_remainder(uint64_t x, uint64_t remainder) noexcept {
 [[nodiscard]] static inline IsqrtRemainder
 isqrt64_with_remainder(uint64_t n) noexcept {
     const uint64_t x =
-        static_cast<uint64_t>(__builtin_sqrt(static_cast<double>(n)));
+        static_cast<uint64_t>(sqrt_u64(n));
     const uint64_t remainder = n - x * x;
 
     if (remainder >> 63) [[unlikely]] {
@@ -83,13 +95,27 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     }
 
     const int a = __builtin_clzll(hi) >> 1;
-    const uint128_t scaled_n = n << (a << 1);
-    const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const unsigned shift = static_cast<unsigned>(a << 1);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
+
+    //x86限定で無駄なassemblyを無理やり吐かないようにする
+    #if defined(__x86_64__) || defined(__amd64__)
+        uint64_t u = hi;
+        __asm__("shldq %%cl, %1, %0"
+            : "+r"(u)
+            : "r"(n_lo), "c"(shift)
+            : "cc");
+        const uint64_t scaled_lo = n_lo << shift;
+    #else
+        const uint128_t scaled_n = n << shift;
+        const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+        const uint64_t scaled_lo = static_cast<uint64_t>(scaled_n);
+    #endif
+
     const auto [isqu, remainder] = isqrt64_with_remainder(u);
 
     const uint64_t quotient =
-        ((remainder << 31) | (static_cast<uint64_t>(scaled_n) >> 33)) /
-        isqu;
+        ((remainder << 31) | (scaled_lo >> 33)) / isqu;
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
 
@@ -114,49 +140,36 @@ template <uint64_t Mod>
 
 // 64-bit 平方判定
 [[nodiscard]] inline bool is_perfect_square64(uint64_t n) noexcept {
-    // Mod 64 フィルター (11/64 のみ通過 => 82.8% を即座に reject)
+    // Mod 64 フィルター (12/64 のみ通過 => 81.25% を即座に reject)
     constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    
+
     if ((sq_mod64_mask & (1ULL << (n & 63))) == 0) [[likely]] {
         return false;
     }
 
-    // Mod 63 フィルター (n % 63 の余りチェック)
-    // 63 剰余も下位 6bit 判定同様にルックアップテーブルで弾く場合
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    // フィルタを抜けた約 4.3% の候補のみ isqrt64_with_sq を実行
-    auto [r, sq] = isqrt64_with_sq(n);
-    return sq == n;
+    const auto result = isqrt64_with_sq(n);
+    return result.sq == n;
 }
 
 // 128-bit 平方判定
 [[nodiscard]] inline bool is_perfect_square128(uint128_t n) noexcept {
-    // 128-bit でも下位 64-bit の Mod 64 判定はそのまま成立する
+    // 128-bit でも下位 6 bit による Mod 64 判定はそのまま成立する
     constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    uint64_t n_lo = static_cast<uint64_t>(n);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
 
     if ((sq_mod64_mask & (1ULL << (n_lo & 63))) == 0) [[likely]] {
         return false;
     }
 
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    // 64-bit 内に収まる場合は 64-bit 判定へ移譲
+    // 64-bit に収まる場合は 64-bit 平方根で判定
     if (n <= UINT64_MAX) {
-        auto [r, sq] = isqrt64_with_sq(n_lo);
-        return sq == n_lo;
+        const auto result = isqrt64_with_sq(n_lo);
+        return result.sq == n_lo;
     }
 
     // 128-bit での最終検証
-    uint128_t r = isqrt128(n);
-    return (r * r) == n;
+    const uint128_t r = isqrt128(n);
+    return r * r == n;
 }
 
 } // namespace fast_isqrt
