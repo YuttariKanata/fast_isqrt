@@ -59,6 +59,13 @@ void test_corner_cases() {
     assert(is_perfect_square64(3) == false);
     assert(is_perfect_square64(4) == true);
     assert(is_perfect_square64(5) == false);
+    
+    assert(is_perfect_square128(static_cast<uint128_t>(0)) == true);
+    assert(is_perfect_square128(static_cast<uint128_t>(1)) == true);
+    assert(is_perfect_square128(static_cast<uint128_t>(2)) == false);
+    assert(is_perfect_square128(static_cast<uint128_t>(3)) == false);
+    assert(is_perfect_square128(static_cast<uint128_t>(4)) == true);
+    assert(is_perfect_square128(static_cast<uint128_t>(5)) == false);
 
     // UINT32_MAX 境界
     uint64_t r32 = UINT32_MAX; // 2^32 - 1

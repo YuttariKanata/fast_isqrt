@@ -114,22 +114,12 @@ template <uint64_t Mod>
 
 // 64-bit 平方判定
 [[nodiscard]] inline bool is_perfect_square64(uint64_t n) noexcept {
-    // Mod 64 フィルター (11/64 のみ通過 => 82.8% を即座に reject)
     constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    
     if ((sq_mod64_mask & (1ULL << (n & 63))) == 0) [[likely]] {
         return false;
     }
 
-    // Mod 63 フィルター (n % 63 の余りチェック)
-    // 63 剰余も下位 6bit 判定同様にルックアップテーブルで弾く場合
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    // フィルタを抜けた約 4.3% の候補のみ isqrt64_with_sq を実行
-    auto [r, sq] = isqrt64_with_sq(n);
+    const auto [r, sq] = isqrt64_with_sq(n);
     return sq == n;
 }
 
@@ -137,19 +127,14 @@ template <uint64_t Mod>
 [[nodiscard]] inline bool is_perfect_square128(uint128_t n) noexcept {
     // 128-bit でも下位 64-bit の Mod 64 判定はそのまま成立する
     constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    uint64_t n_lo = static_cast<uint64_t>(n);
 
-    if ((sq_mod64_mask & (1ULL << (n_lo & 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
+    if ((sq_mod64_mask & (1ULL << (n & 63))) == 0) [[likely]] {
         return false;
     }
 
     // 64-bit 内に収まる場合は 64-bit 判定へ移譲
-    if (n <= UINT64_MAX) {
+    if (!(n >> 64)) {
+        uint64_t n_lo = static_cast<uint64_t>(n);
         auto [r, sq] = isqrt64_with_sq(n_lo);
         return sq == n_lo;
     }
