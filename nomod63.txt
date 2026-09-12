@@ -1,0 +1,60 @@
+
+Performance & Latency Benchmark (Speed Test - CPU Cycles)...
+
+ [sqrt64]
+--------------------------------------------------
+ Benchmark Results (isqrt64):
+   - Seed         : 1788649239779
+   - Data Size    : 100000000 elements (Random 64-bit)
+   - Total Cycles : 785240645 cycles
+   - Avg Speed    : 7.85241 cycles / call
+--------------------------------------------------
+ Benchmark Results (isqrt64):
+   - Seed         : 1788649240856
+   - Data Size    : 100000000 elements (Random 64-bit)
+   - Total Cycles : 745420493 cycles
+   - Avg Speed    : 7.4542 cycles / call
+--------------------------------------------------
+ Benchmark Results (isqrt64):
+   - Seed         : 1788649241710
+   - Data Size    : 100000000 elements (Random 64-bit)
+   - Total Cycles : 733277142 cycles
+   - Avg Speed    : 7.33277 cycles / call
+--------------------------------------------------
+
+ [sqrt128]
+--------------------------------------------------
+ Benchmark Results (isqrt128):
+   - Seed         : 1788649242564
+   - Data Size    : 100000000 elements (Random 128-bit)
+   - Total Cycles : 1194563193 cycles
+   - Avg Speed    : 11.9456 cycles / call
+--------------------------------------------------
+ Benchmark Results (isqrt128):
+   - Seed         : 1788649244272
+   - Data Size    : 100000000 elements (Random 128-bit)
+   - Total Cycles : 1202255020 cycles
+   - Avg Speed    : 12.0226 cycles / call
+--------------------------------------------------
+ Benchmark Results (isqrt128):
+   - Seed         : 1788649245703
+   - Data Size    : 100000000 elements (Random 128-bit)
+   - Total Cycles : 1296815016 cycles
+   - Avg Speed    : 12.9682 cycles / call
+--------------------------------------------------
+
+ [is_perfect_square64]
+--------------------------------------------------
+ Benchmark Results (is_perfect_square64):
+   - Random Inputs (Early Reject) : 5.05937 cycles / call (Hits: 0)
+   - Pure Squares  (Worst-case)   : 6.75266 cycles / call (Hits: 100000000)
+--------------------------------------------------
+
+ [is_perfect_square128]
+--------------------------------------------------
+ Benchmark Results (is_perfect_square128):
+   - Random Inputs (Early Reject) : 6.92245 cycles / call (Hits: 0)
+   - Pure Squares  (Worst-case)   : 17.5067 cycles / call (Hits: 100000000)
+--------------------------------------------------
+
+[✓] Benchmark Completed Successfully!
