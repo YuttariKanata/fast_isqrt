@@ -242,42 +242,28 @@ template <uint64_t Mod>
         return false;
     }
 
-    // Mod 63 フィルター (n % 63 の余りチェック)
-    // 63 剰余も下位 6bit 判定同様にルックアップテーブルで弾く場合
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
-        return false;
-    }
-
-    // フィルタを抜けた約 4.3% の候補のみ isqrt64_with_sq を実行
-    auto [r, sq] = isqrt64_with_square(n);
+    const auto [r, sq] = isqrt64_with_square(n);
     return sq == n;
 }
 
 // 128-bit 平方判定
 [[nodiscard]] inline bool is_perfect_square128(uint128_t n) noexcept {
-    // 128-bit でも下位 6 bit による Mod 64 判定はそのまま成立する
     constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    uint64_t n_lo = static_cast<uint64_t>(n);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
 
     if ((sq_mod64_mask & (1ULL << (n_lo & 63))) == 0) [[likely]] {
         return false;
     }
 
-    constexpr uint64_t sq_mod63_mask = generate_sq_mod_mask<63>();
-    if ((sq_mod63_mask & (1ULL << (n % 63))) == 0) [[likely]] {
-        return false;
-    }
-
     // 64-bit 内に収まる場合は 64-bit 判定へ移譲
     if (n <= UINT64_MAX) {
-        auto [r, sq] = isqrt64_with_square(n_lo);
+        const auto [r, sq] = isqrt64_with_square(n_lo);
         return sq == n_lo;
     }
 
     // 128-bit での最終検証
-    uint128_t r = isqrt128(n);
-    return (r * r) == n;
+    const uint128_t r = isqrt128(n);
+    return r * r == n;
 }
 
 } // namespace fast_isqrt
