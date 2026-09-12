@@ -44,13 +44,9 @@ int main() {
     std::cout << "\n [sqrt64]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
-    for (int i = 0; i < 3; i++) {
+    for (auto reptime : {0, 1, 2}) {
 
-        auto now = std::chrono::system_clock::now();
-        auto duration = now.time_since_epoch();
-        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-
-        std::mt19937_64 rng_speed(static_cast<uint64_t>(millis));
+        std::mt19937_64 rng_speed(13337 + reptime);
         const int SPEED_SAMPLES = 100000000; // 1億回試行
         std::vector<uint64_t> bench_data(SPEED_SAMPLES);
 
@@ -79,7 +75,6 @@ int main() {
         double cycles_per_op = static_cast<double>(total_cycles) / SPEED_SAMPLES;
 
         std::cout << " Benchmark Results (isqrt64):" << std::endl;
-        std::cout << "   - Seed         : " << static_cast<uint64_t>(millis) << std::endl;
         std::cout << "   - Data Size    : " << SPEED_SAMPLES << " elements (Random 64-bit)" << std::endl;
         std::cout << "   - Total Cycles : " << total_cycles << " cycles" << std::endl;
         std::cout << "   - Avg Speed    : " << cycles_per_op << " cycles / call" << std::endl;
@@ -89,13 +84,9 @@ int main() {
     std::cout << "\n [sqrt128]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
-    for (int i = 0; i < 3; i++) {
+    for (auto reptime : {0, 1, 2}) {
 
-        auto now = std::chrono::system_clock::now();
-        auto duration = now.time_since_epoch();
-        auto millis = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-
-        std::mt19937_64 rng_speed(static_cast<uint64_t>(millis));
+        std::mt19937_64 rng_speed(13337 + reptime);
         const int SPEED_SAMPLES = 100000000; // 1億回試行
         std::vector<uint128_t> bench_data(SPEED_SAMPLES);
 
@@ -126,7 +117,6 @@ int main() {
         double cycles_per_op = static_cast<double>(total_cycles) / SPEED_SAMPLES;
 
         std::cout << " Benchmark Results (isqrt128):" << std::endl;
-        std::cout << "   - Seed         : " << static_cast<uint64_t>(millis) << std::endl;
         std::cout << "   - Data Size    : " << SPEED_SAMPLES << " elements (Random 128-bit)" << std::endl;
         std::cout << "   - Total Cycles : " << total_cycles << " cycles" << std::endl;
         std::cout << "   - Avg Speed    : " << cycles_per_op << " cycles / call" << std::endl;
@@ -139,12 +129,9 @@ int main() {
     std::cout << "\n [is_perfect_square64]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
-    {
-        auto millis = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count());
+    for (auto reptime : {0, 1, 2}) {
 
-        std::mt19937_64 rng(millis);
+        std::mt19937_64 rng(13337 + reptime);
         const int SPEED_SAMPLES = 100000000;
         std::vector<uint64_t> random_data(SPEED_SAMPLES);
         std::vector<uint64_t> square_data(SPEED_SAMPLES);
@@ -186,12 +173,9 @@ int main() {
     std::cout << "\n [is_perfect_square128]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
-    {
-        auto millis = static_cast<uint64_t>(
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                std::chrono::system_clock::now().time_since_epoch()).count());
+    for (auto reptime : {0, 1, 2}) {
 
-        std::mt19937_64 rng(millis);
+        std::mt19937_64 rng(13337 + reptime);
         const int SPEED_SAMPLES = 100000000;
         std::vector<uint128_t> random_data(SPEED_SAMPLES);
         std::vector<uint128_t> square_data(SPEED_SAMPLES);
