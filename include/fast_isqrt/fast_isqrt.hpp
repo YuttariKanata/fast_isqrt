@@ -11,7 +11,7 @@ namespace fast_isqrt {
 
 using uint128_t = unsigned __int128;
 
-[[nodiscard]] static inline double sqrt_u64(uint64_t n) noexcept {
+[[nodiscard]] static inline uint64_t sqrt_u64(uint64_t n) noexcept {
     double x = static_cast<double>(n);
     #if defined(__AVX__) && (defined(__x86_64__) || defined(__amd64__))
         __asm__("vsqrtsd %0, %0, %0" : "+x"(x));
