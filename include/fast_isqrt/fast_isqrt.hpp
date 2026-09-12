@@ -13,13 +13,13 @@ using uint128_t = unsigned __int128;
 
 [[nodiscard]] static inline uint64_t sqrt_u64(uint64_t n) noexcept {
     double x = static_cast<double>(n);
-    #if defined(__AVX__) && (defined(__x86_64__) || defined(__amd64__))
-        __asm__("vsqrtsd %0, %0, %0" : "+x"(x));
-    #elif defined(__SSE2__) && (defined(__x86_64__) || defined(__amd64__))
-        __asm__("sqrtsd %0, %0" : "+x"(x));
-    #else
-        x = __builtin_sqrt(x);
-    #endif
+#if defined(__AVX__) && (defined(__x86_64__) || defined(__amd64__))
+    __asm__("vsqrtsd %0, %0, %0" : "+x"(x));
+#elif defined(__SSE2__) && (defined(__x86_64__) || defined(__amd64__))
+    __asm__("sqrtsd %0, %0" : "+x"(x));
+#else
+    x = __builtin_sqrt(x);
+#endif
     return static_cast<uint64_t>(x);
 }
 
@@ -92,22 +92,22 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     }
 
     const int a = __builtin_clzll(hi) >> 1;
-    const unsigned shift = static_cast<unsigned>(a << 1);
-    const uint64_t n_lo = static_cast<uint64_t>(n);
 
     //x86限定で無駄なassemblyを無理やり吐かないようにする
-    #if defined(__x86_64__) || defined(__amd64__)
-        uint64_t u = hi;
-        __asm__("shldq %%cl, %1, %0"
-            : "+r"(u)
-            : "r"(n_lo), "c"(shift)
-            : "cc");
-        const uint64_t scaled_lo = n_lo << shift;
-    #else
-        const uint128_t scaled_n = n << shift;
-        const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
-        const uint64_t scaled_lo = static_cast<uint64_t>(scaled_n);
-    #endif
+#if defined(__x86_64__) || defined(__amd64__)
+    const unsigned shift = static_cast<unsigned>(a << 1);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
+    uint64_t u = hi;
+    __asm__("shldq %%cl, %1, %0"
+        : "+r"(u)
+        : "r"(n_lo), "c"(shift)
+        : "cc");
+    const uint64_t scaled_lo = n_lo << shift;
+#else
+    const uint128_t scaled_n = n << (a << 1);
+    const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const uint64_t scaled_lo = static_cast<uint64_t>(scaled_n);
+#endif
 
     const auto [isqu, remainder] = isqrt64_with_remainder(u);
 
@@ -151,12 +151,27 @@ handle_max_isqrt128_with_square() noexcept {
     }
 
     const int a = __builtin_clzll(hi) >> 1;
+
+    //x86限定で無駄なassemblyを無理やり吐かないようにする
+#if defined(__x86_64__) || defined(__amd64__)
+    const unsigned shift = static_cast<unsigned>(a << 1);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
+    uint64_t u = hi;
+    __asm__("shldq %%cl, %1, %0"
+        : "+r"(u)
+        : "r"(n_lo), "c"(shift)
+        : "cc");
+    const uint64_t scaled_lo = n_lo << shift;
+#else
     const uint128_t scaled_n = n << (a << 1);
     const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const uint64_t scaled_lo = static_cast<uint64_t>(scaled_n);
+#endif
+
     const auto [isqu, remainder] = isqrt64_with_remainder(u);
 
     const uint64_t quotient =
-        ((remainder << 31) | (static_cast<uint64_t>(scaled_n) >> 33)) /
+        ((remainder << 31) | (scaled_lo >> 33)) /
         isqu;
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
@@ -201,12 +216,27 @@ handle_max_isqrt128_with_remainder(uint128_t n) noexcept {
     }
 
     const int a = __builtin_clzll(hi) >> 1;
+
+    //x86限定で無駄なassemblyを無理やり吐かないようにする
+#if defined(__x86_64__) || defined(__amd64__)
+    const unsigned shift = static_cast<unsigned>(a << 1);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
+    uint64_t u = hi;
+    __asm__("shldq %%cl, %1, %0"
+        : "+r"(u)
+        : "r"(n_lo), "c"(shift)
+        : "cc");
+    const uint64_t scaled_lo = n_lo << shift;
+#else
     const uint128_t scaled_n = n << (a << 1);
     const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const uint64_t scaled_lo = static_cast<uint64_t>(scaled_n);
+#endif
+
     const auto [isqu, remainder] = isqrt64_with_remainder(u);
 
     const uint64_t quotient =
-        ((remainder << 31) | (static_cast<uint64_t>(scaled_n) >> 33)) /
+        ((remainder << 31) | (scaled_lo >> 33)) /
         isqu;
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
