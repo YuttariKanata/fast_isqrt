@@ -230,6 +230,6 @@ int main() {
         std::cout << "--------------------------------------------------" << std::endl;
     }
 
-    std::cout << "\n[✓] Benchmark Completed Successfully!\n";
+    std::cout << "\n[OK] Benchmark Completed Successfully!\n";
     return 0;
 }

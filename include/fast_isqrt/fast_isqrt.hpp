@@ -20,7 +20,7 @@ using uint128_t = unsigned __int128;
     #else
         x = __builtin_sqrt(x);
     #endif
-    return x;
+    return static_cast<uint64_t>(x);
 }
 
 [[gnu::noinline, gnu::cold]] static uint64_t
@@ -29,8 +29,7 @@ correct_isqrt64(uint64_t x) noexcept {
 }
 
 [[nodiscard]] inline uint64_t isqrt64(uint64_t n) noexcept {
-    const uint64_t x =
-        static_cast<uint64_t>(sqrt_u64(n));
+    const uint64_t x = sqrt_u64(n);
     const uint64_t remainder = n - x * x;
 
     // Unsigned underflow marks an overshoot in the top bit.
@@ -53,8 +52,7 @@ correct_isqrt64_with_square(uint64_t x, uint64_t sq) noexcept {
 }
 
 [[nodiscard]] inline IsqrtSquare64 isqrt64_with_square(uint64_t n) noexcept {
-    const uint64_t x =
-        static_cast<uint64_t>(sqrt_u64(n));
+    const uint64_t x = sqrt_u64(n);
     const uint64_t sq = x * x;
 
     if ((n - sq) >> 63) [[unlikely]] {
@@ -77,8 +75,7 @@ correct_isqrt64_with_remainder(uint64_t x, uint64_t remainder) noexcept {
 
 [[nodiscard]] static inline IsqrtRemainder64
 isqrt64_with_remainder(uint64_t n) noexcept {
-    const uint64_t x =
-        static_cast<uint64_t>(sqrt_u64(n));
+    const uint64_t x = sqrt_u64(n);
     const uint64_t remainder = n - x * x;
 
     if (remainder >> 63) [[unlikely]] {
@@ -253,7 +250,7 @@ template <uint64_t Mod>
     }
 
     // フィルタを抜けた約 4.3% の候補のみ isqrt64_with_sq を実行
-    auto [r, sq] = isqrt64_with_sq(n);
+    auto [r, sq] = isqrt64_with_square(n);
     return sq == n;
 }
 
@@ -274,7 +271,7 @@ template <uint64_t Mod>
 
     // 64-bit 内に収まる場合は 64-bit 判定へ移譲
     if (n <= UINT64_MAX) {
-        auto [r, sq] = isqrt64_with_sq(n_lo);
+        auto [r, sq] = isqrt64_with_square(n_lo);
         return sq == n_lo;
     }
 
