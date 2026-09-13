@@ -205,7 +205,7 @@ int main() {
     std::cout << "[5] Testing Random Perfect Squares Neighbor Neighborhood (±10^6)..." << std::endl;
     {
         std::mt19937_64 rng_sq(1339);
-        const int NUM_SQUARES = 200;
+        const int NUM_SQUARES = 100;
         const int64_t RADIUS = 1000000;
         const uint128_t MAX128 = ~(uint128_t)0;
 

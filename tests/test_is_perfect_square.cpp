@@ -227,6 +227,51 @@ void test_random_perfect_square_neighbor(uint64_t seed, int num_squares, int64_t
     std::cout << "[PASS] Perfect Square Neighbor Test Passed Successfully!\n" << std::endl;
 }
 
+static inline void check(uint64_t n, bool expected) {
+    const bool actual64 = is_perfect_square64(n);
+
+    if (actual64 != expected) [[unlikely]] {
+
+        const uint128_t base_x = isqrt128(static_cast<uint128_t>(n)+1);
+        const uint128_t sq = base_x * base_x;
+        std::cerr << std::format("\n[FAIL] Off-by-One Test Failed!") << std::endl;
+        std::cerr << std::format("  base_x   = {}", base_x) << std::endl;
+        std::cerr << std::format("  sq       = {}", to_hex_128(sq)) << std::endl;
+        std::cerr << std::format("  target_n = {}", to_hex_128(n)) << std::endl;
+        std::cerr << std::format("  expected = {}, actual64 = {}", expected, actual64) << std::endl;
+        std::exit(1);
+    }
+}
+
+void test_all_32bit_square_off_by_one() {
+    using namespace fast_isqrt;
+
+    std::cout << "[Testing] All 2^32 Perfect Squares Off-By-One Test (x = 0 .. 2^32 - 1)" << std::endl;
+
+    constexpr uint64_t TOTAL_X = 1ULL << 32;
+
+    check(0ULL, true);
+    check(1ULL, true);
+    check(2ULL, false);
+    check(UINT64_MAX, false);
+
+    for (uint64_t base_x = 2; base_x < TOTAL_X; ++base_x) {
+        const uint128_t sq = static_cast<uint128_t>(base_x) * base_x;
+
+        check(sq - 1, false);
+        check(sq, true);
+        check(sq + 1, false);
+
+        if ((base_x & 0x0FFFFFFF) == 0x0FFFFFFF) [[unlikely]] {
+            std::cout
+                << std::format("  Progress: {:10} / {} ({:.1f}%)", base_x, TOTAL_X, (static_cast<double>(base_x) / TOTAL_X) * 100.0)
+                << std::endl;
+        }
+    }
+
+    std::cout << "[PASS] All 2^32 Perfect Squares Off-By-One Test Passed Successfully!\n" << std::endl;
+}
+
 int main() {
 
     uint64_t now_seed = get_current_time_ms();
@@ -240,6 +285,7 @@ int main() {
     test_random_64bit(now_seed, 10'000'000);
     test_random_128bit(now_seed, 5'000'000);
     test_random_perfect_square_neighbor(now_seed, 100, 1000000);
+    test_all_32bit_square_off_by_one();
 
     std::cout << "\n[✓] ALL TESTS PASSED SUCCESSFULLY!" << std::endl;
     return 0;
