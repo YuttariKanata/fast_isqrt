@@ -87,8 +87,11 @@ isqrt64_with_remainder(uint64_t n) noexcept {
 
 [[nodiscard]] inline uint64_t isqrt128(uint128_t n) noexcept {
     const uint64_t hi = static_cast<uint64_t>(n >> 64);
-    if (hi == 0) [[unlikely]] {
-        return isqrt64(static_cast<uint64_t>(n));
+    if ((hi+1) <= 1) [[unlikely]] {
+        if (hi == 0) {
+            return isqrt64(static_cast<uint64_t>(n));
+        }
+        return UINT64_MAX;
     }
 
     const int a = __builtin_clzll(hi) >> 1;
@@ -115,10 +118,6 @@ isqrt64_with_remainder(uint64_t n) noexcept {
         ((remainder << 31) | (scaled_lo >> 33)) / isqu;
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
-
-    if (hi == UINT64_MAX) [[unlikely]] {
-        return UINT64_MAX;
-    }
 
     const uint128_t final_remainder =
         n - static_cast<uint128_t>(x) * x;

@@ -9,6 +9,10 @@
 * 二分探索
 * ニュートン法
 
+### 最適化のしていないもの
+
+[Nyaan's Library : isqrt.hpp](https://nyaannyaan.github.io/library/math/isqrt.hpp.html?ref=trap.jp)
+
 ### long doubleを使ったもの
 
 ```cpp
@@ -16,4 +20,3 @@
     return static_cast<uint64_t>(std::sqrt(static_cast<long double>(n)));
 }
 ```
-
