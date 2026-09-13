@@ -284,13 +284,6 @@ template <uint64_t Mod>
         return false;
     }
 
-    // 64-bit 内に収まる場合は 64-bit 判定へ移譲
-    if (n <= UINT64_MAX) [[unlikely]] {
-        const uint64_t n_lo = static_cast<uint64_t>(n);
-        const auto [r, sq] = isqrt64_with_square(n_lo);
-        return sq == n_lo;
-    }
-
     // 128-bit での最終検証
     const uint128_t r = isqrt128(n);
     return r * r == n;
