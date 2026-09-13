@@ -279,14 +279,14 @@ template <uint64_t Mod>
 // 128-bit 平方判定
 [[nodiscard]] inline bool is_perfect_square128(uint128_t n) noexcept {
     constexpr uint64_t sq_mod64_mask = generate_sq_mod_mask<64>();
-    const uint64_t n_lo = static_cast<uint64_t>(n);
 
-    if ((sq_mod64_mask & (1ULL << (n_lo & 63))) == 0) [[likely]] {
+    if ((sq_mod64_mask & (1ULL << (n & 63))) == 0) [[likely]] {
         return false;
     }
 
     // 64-bit 内に収まる場合は 64-bit 判定へ移譲
-    if (n <= UINT64_MAX) {
+    if (n <= UINT64_MAX) [[unlikely]] {
+        const uint64_t n_lo = static_cast<uint64_t>(n);
         const auto [r, sq] = isqrt64_with_square(n_lo);
         return sq == n_lo;
     }

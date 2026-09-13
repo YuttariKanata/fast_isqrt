@@ -35,6 +35,46 @@ static inline uint64_t get_cpu_cycles(void) {
 #endif
 }
 
+struct Mod64NonSquares {
+    static constexpr std::size_t total_count = 64;
+    
+    // 平方剰余の個数を事前に計算
+    static constexpr std::size_t num_squares = []() {
+        std::array<bool, total_count> is_sq{};
+        std::size_t count = 0;
+        for (std::size_t i = 0; i < total_count; ++i) {
+            std::size_t rem = (i * i) % total_count;
+            if (!is_sq[rem]) {
+                is_sq[rem] = true;
+                ++count;
+            }
+        }
+        return count;
+    }();
+
+    // 非平方剰余の個数 (64 - 平方剰余の個数)
+    static constexpr std::size_t count = total_count - num_squares;
+
+    // 非平方剰余テーブル本体
+    static constexpr std::array<uint8_t, count> table = []() {
+        std::array<bool, total_count> is_sq{};
+        for (std::size_t i = 0; i < total_count; ++i) {
+            is_sq[(i * i) % total_count] = true;
+        }
+
+        std::array<uint8_t, count> non_sq{};
+        std::size_t idx = 0;
+        for (std::size_t i = 0; i < total_count; ++i) {
+            if (!is_sq[i]) {
+                non_sq[idx++] = static_cast<uint8_t>(i);
+            }
+        }
+        return non_sq;
+    }();
+};
+
+constexpr auto NON_SQUARE_MOD64 = Mod64NonSquares::table;
+
 using namespace fast_isqrt;
 
 int main() {
@@ -135,11 +175,15 @@ int main() {
         const int SPEED_SAMPLES = 100000000;
         std::vector<uint64_t> random_data(SPEED_SAMPLES);
         std::vector<uint64_t> square_data(SPEED_SAMPLES);
+        std::vector<uint64_t> nonsquare_data(SPEED_SAMPLES);
 
         for (int i = 0; i < SPEED_SAMPLES; ++i) {
             random_data[i] = rng();
             uint64_t r = rng() & UINT32_MAX;
             square_data[i] = r * r;
+
+            uint8_t non_sq = NON_SQUARE_MOD64[rng() % NON_SQUARE_MOD64.size()];
+            nonsquare_data[i] = (rng() & ~0x3FULL) | non_sq;
         }
 
         // Random データ計測 (Early Reject 性能)
@@ -158,12 +202,22 @@ int main() {
         }
         uint64_t c3 = get_cpu_cycles();
 
-        double cycles_rand = static_cast<double>(c1 - c0) / SPEED_SAMPLES;
-        double cycles_sq   = static_cast<double>(c3 - c2) / SPEED_SAMPLES;
+        // Non Square データ計測 (Best-case 性能)
+        volatile uint64_t hits_nonsq = 0;
+        uint64_t c4 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_nonsq += is_perfect_square64(nonsquare_data[i]);
+        }
+        uint64_t c5 = get_cpu_cycles();
+
+        double cycles_rand  = static_cast<double>(c1 - c0) / SPEED_SAMPLES;
+        double cycles_sq    = static_cast<double>(c3 - c2) / SPEED_SAMPLES;
+        double cycles_nonsq = static_cast<double>(c5 - c4) / SPEED_SAMPLES;
 
         std::cout << " Benchmark Results (is_perfect_square64):" << std::endl;
-        std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand << " cycles / call (Hits: " << hits_rand << ")" << std::endl;
-        std::cout << "   - Pure Squares  (Worst-case)   : " << cycles_sq   << " cycles / call (Hits: " << hits_sq << ")" << std::endl;
+        std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand  << " cycles / call (Hits: " << hits_rand  << ")" << std::endl;
+        std::cout << "   - Pure Squares  (Worst-case)   : " << cycles_sq    << " cycles / call (Hits: " << hits_sq    << ")" << std::endl;
+        std::cout << "   - Non  Squares  (Best-case)    : " << cycles_nonsq << " cycles / call (Hits: " << hits_nonsq << ")" << std::endl;
         std::cout << "--------------------------------------------------" << std::endl;
     }
 
@@ -179,6 +233,7 @@ int main() {
         const int SPEED_SAMPLES = 100000000;
         std::vector<uint128_t> random_data(SPEED_SAMPLES);
         std::vector<uint128_t> square_data(SPEED_SAMPLES);
+        std::vector<uint128_t> nonsquare_data(SPEED_SAMPLES);
 
         for (int i = 0; i < SPEED_SAMPLES; ++i) {
             uint64_t hi = rng();
@@ -187,6 +242,12 @@ int main() {
 
             uint128_t r = static_cast<uint128_t>(rng()); // 64bit r
             square_data[i] = r * r;
+
+            hi = rng();
+            lo = rng();
+            uint8_t non_sq1 = NON_SQUARE_MOD64[rng() % NON_SQUARE_MOD64.size()];
+            lo = (lo & ~0x3FULL) | non_sq1;
+            nonsquare_data[i] = (static_cast<uint128_t>(hi) << 64) | lo;
         }
 
         // Random データ計測 (Early Reject 性能)
@@ -205,12 +266,22 @@ int main() {
         }
         uint64_t c3 = get_cpu_cycles();
 
-        double cycles_rand = static_cast<double>(c1 - c0) / SPEED_SAMPLES;
-        double cycles_sq   = static_cast<double>(c3 - c2) / SPEED_SAMPLES;
+        // Non Square データ計測 (Best-case 性能)
+        volatile uint64_t hits_nonsq = 0;
+        uint64_t c4 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_nonsq += is_perfect_square128(nonsquare_data[i]);
+        }
+        uint64_t c5 = get_cpu_cycles();
+
+        double cycles_rand  = static_cast<double>(c1 - c0) / SPEED_SAMPLES;
+        double cycles_sq    = static_cast<double>(c3 - c2) / SPEED_SAMPLES;
+        double cycles_nonsq = static_cast<double>(c5 - c4) / SPEED_SAMPLES;
 
         std::cout << " Benchmark Results (is_perfect_square128):" << std::endl;
-        std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand << " cycles / call (Hits: " << hits_rand << ")" << std::endl;
-        std::cout << "   - Pure Squares  (Worst-case)   : " << cycles_sq   << " cycles / call (Hits: " << hits_sq << ")" << std::endl;
+        std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand  << " cycles / call (Hits: " << hits_rand  << ")" << std::endl;
+        std::cout << "   - Pure Squares  (Worst-case)   : " << cycles_sq    << " cycles / call (Hits: " << hits_sq    << ")" << std::endl;
+        std::cout << "   - Pure Squares  (Best-case)    : " << cycles_nonsq << " cycles / call (Hits: " << hits_nonsq << ")" << std::endl;
         std::cout << "--------------------------------------------------" << std::endl;
     }
 
