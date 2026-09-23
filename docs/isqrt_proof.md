@@ -1,5 +1,7 @@
 # hoge
 
+## isqrt64の正当性
+
 $`n\ge1`$について考えます。この時$`\text{ulp}(n) = 2^{\lfloor \log_2(n) \rfloor - 52}`$です。\
 $`n_d =`$ `static_cast<double>(n)`\
 $`s_r =`$ `std::sqrt(static_cast<double>(n))`\
@@ -8,9 +10,11 @@ $`k = \lfloor\sqrt{n}\rfloor`$\
 $`M = k - \frac{1}{2}\text{ulp}(k)`$\
 と置きます。
 
-ここで、`double`はIEEE 754 binary64であり、整数から`double`への変換および`std::sqrt`は`Round-to-Nearest, Ties-to-Even (RN)`で丸められるものとします。目標は$`k\le s`$を示すことです。
+ここで、`double`はIEEE 754 binary64であり、整数から`double`への変換および`std::sqrt`は`Round-to-Nearest, Ties-to-Even (RN)`で丸められるものとします。目標は$`k\le s < k+2`$を示すことです。
 
-[CASE1 : $`k`$が2の冪でない時]
+### $`k\le s`$について
+
+#### [CASE1 : $`k`$が2の冪でない時]
 
 まず、$`M < \sqrt{n_d}`$ならば、$`k \le s_r`$であることを言います。$`k`$のすぐ隣の小さい`double`を$`k^-`$とします。$`k`$が2の冪でないので、$`k^- = k-\text{ulp}(k)`$です。従って、$`k^-`$と$`k`$のちょうど中点は
 
@@ -108,7 +112,7 @@ $$
 
 が示されました。
 
-[CASE2 : $`k`$が2の冪の時]
+#### [CASE2 : $`k`$が2の冪の時]
 
 この時、$`m`$を非負整数として$`k=2^m`$とすると、$`n\ge k^2=2^{2m}`$です。\
 $`k^2=2^{2m}`$は`double`型で正確に表現可能ですから、$`n\ge k^2`$より、$`n_d \ge k^2`$が言えます。\
@@ -121,6 +125,10 @@ $`k^2=2^{2m}`$は`double`型で正確に表現可能ですから、$`n\ge k^2`$�
 $`n=0`$の時は、`static_cast<uint64_t>(std::sqrt(static_cast<double<n>))`が$`0`$になるため大丈夫です。
 
 ---
+
+### $`s < k+2`$について
+
+## isqrt128の正当性
 
 `isqrt128`の方を考えます。\
 $`s_n =`$ `scaled_n`として、$`s_n = 2^{64}u+v`$とします。ただし、$`0\le v < 2^{64}`$です。\
@@ -157,3 +165,8 @@ $$
 よって示せました。
 
 実際には、$`s_n = 2^{2a}n`$であり、$`x=\left\lfloor\frac{Y}{2^a}\right\rfloor`$ですので、本当は$`x \ge \lfloor\sqrt{n}\rfloor`$を示さないといけないのですが、$`Y\ge \left\lfloor\sqrt{s_n}\right\rfloor = \left\lfloor\sqrt{2^{2a}n}\right\rfloor = \left\lfloor2^a\sqrt{n}\right\rfloor \ge \left\lfloor2^a\left\lfloor\sqrt{n}\right\rfloor\right\rfloor = 2^a\left\lfloor\sqrt{n}\right\rfloor`$ですから、両辺$`2^a`$で割ってfloorを取ると、$`\left\lfloor\frac{Y}{2^a}\right\rfloor \ge \left\lfloor\sqrt{n}\right\rfloor`$が示せます。
+
+## is_perfect_square64, is_perfect_square128の正当性
+
+$`k^2=n`$となる時には、$`k=s`$が成立することを示したいです。\
+$`k^2=n`$ですから、$``$

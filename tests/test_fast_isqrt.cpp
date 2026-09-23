@@ -9,6 +9,8 @@
 #include <random>
 #include <chrono>
 #include <iomanip>
+#include <thread>
+#include <algorithm>
 #include <fast_isqrt/fast_isqrt.hpp>
 
 using namespace fast_isqrt;
@@ -18,10 +20,9 @@ using namespace fast_isqrt;
 
 // nsq(n) == x が厳密に floor(sqrt(n)) であるかの数学的検証
 // 条件: x^2 <= n < (x + 1)^2
-bool verify_isqrt(uint128_t n, uint64_t x) {
-    if (x > UINT64_MAX) return false;
+[[nodiscard]] static inline bool verify_isqrt(uint128_t n, uint64_t x) noexcept {
 
-    uint128_t x2 = static_cast<uint128_t>(x) * x;
+    const uint128_t x2 = static_cast<uint128_t>(x) * x;
     if (x2 > n) return false;
     
     // x + 1 が 2^64 を超える場合のオーバーフローチェック
@@ -30,46 +31,71 @@ bool verify_isqrt(uint128_t n, uint64_t x) {
         // uint128_t の max に対して (x+1)^2 > max128 は成り立つ
     }
     
-    uint128_t next_x2 = (static_cast<uint128_t>(x) + 1) * (static_cast<uint128_t>(x) + 1);
+    const uint128_t next_x2 = (static_cast<uint128_t>(x) + 1) * (static_cast<uint128_t>(x) + 1);
     return n < next_x2;
 }
 
 // IsqrtSquare128 の検証
-bool verify_isqrt_with_square(uint128_t n, IsqrtSquare128 res) {
+[[nodiscard]] static inline bool verify_isqrt128_with_square(uint128_t n, const IsqrtSquare128 res) noexcept {
     if (!verify_isqrt(n, res.root)) return false;
-    uint128_t expected_sq = static_cast<uint128_t>(res.root) * res.root;
+    const uint128_t expected_sq = static_cast<uint128_t>(res.root) * res.root;
     return (res.sq == expected_sq) && (res.sq <= n);
 }
 
 // IsqrtRemainder128 の検証
-bool verify_isqrt_with_remainder(uint128_t n, IsqrtRemainder128 res) {
+[[nodiscard]] static inline bool verify_isqrt128_with_remainder(uint128_t n, const IsqrtRemainder128 res) noexcept {
     if (!verify_isqrt(n, res.root)) return false;
-    uint128_t x_sq = static_cast<uint128_t>(res.root) * res.root;
-    return (res.remainder == (n - x_sq)) && ((x_sq + res.remainder) == n);
+    const uint128_t x_sq = static_cast<uint128_t>(res.root) * res.root;
+    return (res.remainder == (n - x_sq)) && (x_sq <= n);
+}
+
+// IsqrtSquare64 の検証
+[[nodiscard]] static inline bool verify_isqrt64_with_square(uint128_t n, const IsqrtSquare64 res) noexcept {
+    if (!verify_isqrt(static_cast<uint128_t>(n), res.root)) return false;
+    const uint128_t expected_sq = static_cast<uint128_t>(res.root) * res.root;
+    return (res.sq == expected_sq) && (res.sq <= n);
+}
+
+// IsqrtRemainder64 の検証
+[[nodiscard]] static inline bool verify_isqrt64_with_remainder(uint128_t n, const IsqrtRemainder64 res) noexcept {
+    if (!verify_isqrt(n, res.root)) return false;
+    const uint128_t x_sq = static_cast<uint128_t>(res.root) * res.root;
+    return (static_cast<uint128_t>(res.remainder) == (n - x_sq)) && (x_sq <= n);
 }
 
 // --------------------------------------------------
-// 統合テストヘルパー (3つの関数全てをテスト)
+// 統合テストヘルパー
 // --------------------------------------------------
-bool test_isqrt_all(uint128_t n, uint64_t& out_root) {
-    out_root = isqrt128(n);
-    if (!verify_isqrt(n, out_root)) return false;
 
-    auto sq_res = isqrt128_with_square(n);
-    if (sq_res.root != out_root) return false;
-    if (!verify_isqrt_with_square(n, sq_res)) return false;
+[[gnu::always_inline, nodiscard]] static inline bool test_isqrt_all(uint128_t n) noexcept {
 
-    auto rem_res = isqrt128_with_remainder(n);
-    if (rem_res.root != out_root) return false;
-    if (!verify_isqrt_with_remainder(n, rem_res)) return false;
+    const uint64_t out_root128 = isqrt128(n);
+    if (!verify_isqrt(n, out_root128)) [[unlikely]] return false;
+
+    const auto sq_res128 = isqrt128_with_square(n);
+    if (sq_res128.root != out_root128) [[unlikely]] return false;
+    if (!verify_isqrt128_with_square(n, sq_res128)) [[unlikely]] return false;
+
+    const auto rem_res128 = isqrt128_with_remainder(n);
+    if (rem_res128.root != out_root128) [[unlikely]] return false;
+    if (!verify_isqrt128_with_remainder(n, rem_res128)) [[unlikely]] return false;
+
+    if (n <= UINT64_MAX) {
+        const uint64_t n64 = static_cast<uint64_t>(n);
+        const uint64_t out_root64 = isqrt64(n64);
+
+        if (!verify_isqrt(n, out_root64)) [[unlikely]] return false;
+
+        const auto sq_res64 = isqrt64_with_square(n64);
+        if (sq_res64.root != out_root64) [[unlikely]] return false;
+        if (!verify_isqrt64_with_square(n, sq_res64)) [[unlikely]] return false;
+
+        const auto rem_res64 = isqrt64_with_remainder(n64);
+        if (rem_res64.root != out_root64) [[unlikely]] return false;
+        if (!verify_isqrt64_with_remainder(n, rem_res64)) [[unlikely]] return false;
+    }
 
     return true;
-}
-
-// out_root を受け取らないオーバーロード
-bool test_isqrt_all(uint128_t n) {
-    uint64_t dummy;
-    return test_isqrt_all(n, dummy);
 }
 
 // --------------------------------------------------
@@ -99,193 +125,203 @@ inline uint128_t make_rand128_with_exact_bits(std::mt19937_64& rng, int bits) {
     return val;
 }
 
-int main() {
-    std::cout << "[1] Edge Cases Verification..." << std::endl;
-    std::vector<uint128_t> edge_cases = {
-        0, 1, 2, 3, 4, 8, 9, 15, 16, 24, 25,
-        0xFFFFFFFFULL, 0x100000000ULL,
-        0xFFFFFFFFFFFFFFFFULL, static_cast<uint128_t>(0xFFFFFFFFFFFFFFFFULL) + 1
-    };
+// --------------------------------------------------
+// テスト用関数
+// --------------------------------------------------
 
-    for (auto n : edge_cases) {
-        uint64_t res;
-        if (!test_isqrt_all(n, res)) {
-            std::cerr << "FAILED at edge case n = " << static_cast<uint64_t>(n) << std::endl;
-            return 1;
-        }
+[[gnu::always_inline]] inline void test_one(uint128_t n) {
+    if (!test_isqrt_all(n)) [[unlikely]] {
+        std::cerr << std::format("FAILED: n = 0x{:016x}{:016x}\n",
+            static_cast<uint64_t>(n >> 64),
+            static_cast<uint64_t>(n));
+
+        std::exit(1);
     }
+
+    return;
+}
+
+void test_range(uint128_t lo, uint128_t hi) {
+    if (lo > hi) [[unlikely]] return;
+
+    // 2^128 個の要素はテストしない。
+    constexpr uint128_t UINT128_MAX = std::numeric_limits<uint128_t>::max();
+    if (lo == 0 && hi == UINT128_MAX) [[unlikely]] {
+        std::cerr << "ERROR: test_range(0, UINT128_MAX) is not allowed." << std::endl;
+        std::exit(1);
+    }
+
+    const unsigned int num_threads = std::max(1u, std::thread::hardware_concurrency());
+    const unsigned int target_threads = (num_threads > 2) ? (num_threads - 2) : 1u;
+
+    const uint128_t count = hi - lo + 1;
+
+    const unsigned int threads = static_cast<unsigned int>(std::min<uint128_t>(target_threads, count));
+
+    const uint128_t base = count / threads;
+    const uint128_t extra = count % threads;
+    // count = base * threads + extra   (0 <= extra < threads)
+
+    std::vector<std::jthread> workers;
+    workers.reserve(threads);
+
+    uint128_t current = lo;
+
+    for (unsigned int i = 0; i < threads; ++i) {
+        const uint128_t size = base + (i < extra ? 1 : 0);
+        // [0] ~ [extra-1] : base+1
+        // [extra] ~ [threads-1] : base
+        // extra * (base + 1) + (threads - extra) * base = threads * base + extra
+
+        const uint128_t begin = current;
+        const uint128_t end = begin + size - 1;
+
+        workers.emplace_back(
+            [begin, end]() {
+                for (uint128_t n = begin;; ++n) {
+                    test_one(n);
+
+                    if (n == end) [[unlikely]] {
+                        break;
+                    }
+                }
+            }
+        );
+
+        current = end + 1;
+    }
+}
+
+int main() {
+    const uint128_t U32MAX_128 = static_cast<uint128_t>(UINT32_MAX);
+    const uint128_t U64MAX_128 = static_cast<uint128_t>(UINT64_MAX);
+    const uint128_t U128MAX = std::numeric_limits<uint128_t>::max();
+
+
+    std::cout << "[1] Basic / Edge Cases..." << std::endl;
+
+    test_range(0, 100000);
+
+    test_one(U32MAX_128 - 1);
+    test_one(U32MAX_128);
+    test_one(U32MAX_128 + 1);
+    test_one(U32MAX_128 + 2);
+    test_one(U32MAX_128 + 3);
+
+    test_one(U64MAX_128 - 1);
+    test_one(U64MAX_128);
+    test_one(U64MAX_128 + 1);
+    test_one(U64MAX_128 + 2);
+    test_one(U64MAX_128 + 3);
+
+    test_one(U128MAX - 2);
+    test_one(U128MAX - 1);
+    test_one(U128MAX);
+
 
     std::cout << "[2] Perfect Squares & Off-by-One Boundaries..." << std::endl;
     for (int bit = 1; bit <= 64; ++bit) {
-        uint128_t x = (1ULL << (bit - 1));
-        if (bit == 64) x = 0xFFFFFFFFFFFFFFFFULL;
+        uint128_t x;
 
-        uint128_t sq = x * x;
+        if (bit == 64) {
+            x = U64MAX_128;
+        } else {
+            x = uint128_t(1) << (bit - 1);
+        }
 
-        // sq - 1
-        if (sq > 0) {
-            if (!test_isqrt_all(sq - 1)) {
-                std::cerr << "FAILED at (x^2 - 1) bit=" << bit << std::endl;
-                return 1;
-            }
-        }
-        // sq
-        if (!test_isqrt_all(sq)) {
-            std::cerr << "FAILED at (x^2) bit=" << bit << std::endl;
-            return 1;
-        }
-        // sq + 1
-        if (sq < ~(uint128_t)0) {
-            if (!test_isqrt_all(sq + 1)) {
-                std::cerr << "FAILED at (x^2 + 1) bit=" << bit << std::endl;
-                return 1;
-            }
-        }
+        const uint128_t sq = x * x;
+
+        test_one(sq - 2);
+        test_one(sq - 1);
+        test_one(sq);
+        test_one(sq + 1);
+        test_one(sq + 2);
     }
 
-    std::cout << "[3] Bit Length Transition Boundaries (lz = 0..127)..." << std::endl;
+
+    std::cout << "[3] Bit-Length Transition Boundaries..." << std::endl;
     for (int k = 1; k <= 127; ++k) {
-        uint128_t base = (uint128_t(1) << k);
+        const uint128_t base = uint128_t(1) << k;
 
-        if (!test_isqrt_all(base - 2)) {
-            std::cerr << "FAILED at 2^" << k << " - 2" << std::endl;
-            return 1;
-        }
-        if (!test_isqrt_all(base - 1)) {
-            std::cerr << "FAILED at 2^" << k << " - 1" << std::endl;
-            return 1;
-        }
-        if (!test_isqrt_all(base)) {
-            std::cerr << "FAILED at 2^" << k << std::endl;
-            return 1;
-        }
-        if (!test_isqrt_all(base + 1)) {
-            std::cerr << "FAILED at 2^" << k << " + 1" << std::endl;
-            return 1;
-        }
-        if (!test_isqrt_all(base + 2)) {
-            std::cerr << "FAILED at 2^" << k << " + 2" << std::endl;
-            return 1;
-        }
+        test_one(base - 2);
+        test_one(base - 1);
+        test_one(base);
+        test_one(base + 1);
+        test_one(base + 2);
     }
 
-    // 128bit 最大値境界
-    uint128_t max128 = ~(uint128_t)0;
-    if (!test_isqrt_all(max128)) {
-        std::cerr << "FAILED at uint128_t MAX" << std::endl;
-        return 1;
-    }
-    if (!test_isqrt_all(max128-1)) {
-        std::cerr << "FAILED at uint128_t MAX - 1" << std::endl;
-        return 1;
-    }
 
     std::cout << "[4] Massive Stress Test across All Bit Lengths (128M Random Samples)..." << std::endl;
-    std::mt19937_64 rng(42);
-    const int SAMPLES_PER_BIT = 1000000;
+    {
+        std::mt19937_64 rng(42);
 
-    for (int bit = 1; bit <= 128; ++bit) {
-        for (int i = 0; i < SAMPLES_PER_BIT; ++i) {
-            uint128_t n = make_rand128_with_exact_bits(rng, i);
+        constexpr int SAMPLES_PER_BIT = 1'000'000;
 
-            uint64_t x;
-            if (!test_isqrt_all(n, x)) {
-                std::cerr << "FAILED Random Test at bit " << bit << " for n = 0x" 
-                          << std::hex << static_cast<uint64_t>(n >> 64) 
-                          << std::setfill('0') << std::setw(16)
-                          << static_cast<uint64_t>(n) << std::dec << std::endl;
-                return 1;
+        for (int bit = 1; bit <= 128; ++bit) {
+            for (int i = 0; i < SAMPLES_PER_BIT; ++i) {
+                const uint128_t n = make_rand128_with_exact_bits(rng, bit);
+
+                test_one(n);
             }
-        }
-        if (bit % 16 == 0) {
-            std::cout << "  Bit lengths 1 to " << bit << " PASSED." << std::endl;
+
+            if ((bit & 0xF) == 0) {
+                std::cout << "  Bit lengths 1 to " << bit << " PASSED." << std::endl;
+            }
         }
     }
 
-    std::cout << "[5] Testing Random Perfect Squares Neighbor Neighborhood (±10^6)..." << std::endl;
+
+    std::cout << "[5] Random Perfect-Square Neighborhoods (±10^6)..." << std::endl;
     {
-        std::mt19937_64 rng_sq(1339);
-        const int NUM_SQUARES = 200;
-        const int64_t RADIUS = 1000000;
-        const uint128_t MAX128 = ~(uint128_t)0;
+        std::mt19937_64 rng(1361);
+
+        constexpr int NUM_SQUARES = 100;
+        constexpr uint128_t RADIUS = 1'000'000;
 
         for (int i = 0; i < NUM_SQUARES; ++i) {
-            uint64_t base_x = rng_sq();
-            uint128_t sq = static_cast<uint128_t>(base_x) * base_x;
+            const uint64_t x = rng();
+            const uint128_t x128 = static_cast<uint128_t>(x);
+            const uint128_t sq = x128 * x128;
 
-            uint128_t start_n = (sq > static_cast<uint128_t>(RADIUS)) ? (sq - RADIUS) : 0;
-            uint128_t end_n = (MAX128 - sq > static_cast<uint128_t>(RADIUS)) ? (sq + RADIUS) : MAX128;
+            const uint128_t start = (sq > RADIUS) ? sq - RADIUS : 0;
 
-            uint128_t n = start_n;
-            do {
-                uint64_t res;
-                if (!test_isqrt_all(n, res)) {
-                    std::cerr << "FAILED at Square Neighborhood Test!" << std::endl;
-                    std::cerr << "  base_x = " << base_x << std::endl;
-                    std::cerr << "  n      = 0x" << std::hex 
-                              << static_cast<uint64_t>(n >> 64) 
-                              << std::setfill('0') << std::setw(16)
-                              << static_cast<uint64_t>(n) << std::dec << std::endl;
-                    return 1;
-                }
-            } while (n++ != end_n);
+            const uint128_t end = (U128MAX - sq > RADIUS) ? sq + RADIUS : U128MAX;
 
-            if ((i + 1) % 20 == 0) {
+            test_range(start, end);
+
+            if (((i + 1) & 0xF) == 0) {
                 std::cout << "  Square neighborhood test: " << (i + 1) << " / " << NUM_SQUARES << " passed." << std::endl;
             }
         }
     }
 
-    std::cout << "[6] Testing [UINT128_MAX - 100'000'000, UINT128_MAX]" << std::endl;
-    {
-        const int64_t RADIUS = 100'000'000;
-        const uint128_t MAX128 = ~(uint128_t)0;
 
-        uint128_t n = MAX128-RADIUS;
-        do {
-            uint64_t res;
-            if (!test_isqrt_all(n, res)) {
-                std::cerr << "FAILED at UINT128_MAX neighbor Test!" << std::endl;
-                std::cerr << "  n      = 0x" << std::hex
-                            << static_cast<uint64_t>(n >> 64) 
-                            << std::setfill('0') << std::setw(16)
-                            << static_cast<uint64_t>(n) << std::dec << std::endl;
-                return 1;
-            }
-        } while (n++ != MAX128);
+    std::cout << "[6] UINT64_MAX, LIMIT_104, UINT128_MAX Neighborhood [MAX-100'000'000, MAX]..." << std::endl;
+    {
+        constexpr uint128_t RADIUS = 200'000'000;
+
+        test_range(U128MAX - RADIUS, U128MAX);
+        test_range(U64MAX_128 - RADIUS, U64MAX_128);
     }
 
-    std::cout << "[7] Testing k^2 neighbors (k = UINT64_MAX - 0..99, R = 1,000,000)" << std::endl;
+
+    std::cout << "[7] k^2 Neighborhoods (k = UINT64_MAX - 0..99, R = 1'000'000)..." << std::endl;
     {
-        const int64_t RADIUS = 1'000'000;
-        const uint64_t K_COUNT = 100;
+        constexpr uint64_t K_COUNT = 200;
+        constexpr uint128_t RADIUS = 1'000'000;
 
         for (uint64_t i = 0; i < K_COUNT; ++i) {
-            uint64_t k = UINT64_MAX - i;
-            uint128_t k128 = k;
-            uint128_t k_sq = k128 * k128;
+            const uint128_t k128 = U64MAX_128 - i;
+            const uint128_t sq = k128 * k128;
 
-            uint128_t start_n = k_sq - RADIUS;
-            uint128_t end_n   = k_sq + RADIUS;
+            test_range(sq - RADIUS, sq + RADIUS);
+        }
 
-            for (uint128_t n = start_n; n <= end_n; ++n) {
-                uint64_t res;
-                if (!test_isqrt_all(n, res)) {
-                    std::cerr << "FAILED at k^2 neighbor Test!" << std::endl;
-                    std::cerr << "  k        = 0x" << std::hex << k << std::dec << std::endl;
-                    std::cerr << "  n        = 0x" << std::hex
-                            << static_cast<uint64_t>(n >> 64)
-                            << std::setfill('0') << std::setw(16)
-                            << static_cast<uint64_t>(n) << std::dec << std::endl;
-                    std::cerr << "  expected = 0x" << std::hex
-                            << static_cast<uint64_t>(k128 >> 64)
-                            << std::setfill('0') << std::setw(16)
-                            << static_cast<uint64_t>(k128) << std::dec << std::endl;
-                    std::cerr << "  got      = 0x" << std::hex
-                            << res << std::dec << std::endl;
-                    return 1;
-                }
-            }
+        for (uint64_t i = 0; i < K_COUNT; ++i) {
+            const uint128_t k128 = U32MAX_128 - i;
+            const uint128_t sq = k128 * k128;
+
+            test_range(sq - RADIUS, sq + RADIUS);
         }
     }
 

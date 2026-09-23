@@ -6,6 +6,8 @@
 #include <chrono>
 #include <fast_isqrt/fast_isqrt.hpp>
 
+using namespace fast_isqrt;
+
 // x86_64 用のヘッダインクルード
 #if defined(__x86_64__)
 #include <x86intrin.h>
@@ -75,27 +77,25 @@ struct Mod64NonSquares {
 
 constexpr auto NON_SQUARE_MOD64 = Mod64NonSquares::table;
 
-using namespace fast_isqrt;
-
 int main() {
 
     std::cout << "\nPerformance & Latency Benchmark (Speed Test - CPU Cycles)..." << std::endl;
 
-    std::cout << "\n [sqrt64]" << std::endl;
+
+
+    std::cout << "\n [isqrt64]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
     for (auto reptime : {0, 1, 2}) {
-
         std::mt19937_64 rng_speed(13337 + reptime);
-        const int SPEED_SAMPLES = 100000000; // 1億回試行
+        const int SPEED_SAMPLES = 100000000;
         std::vector<uint64_t> bench_data(SPEED_SAMPLES);
 
-        // 各種ビット長（全領域）からランダムに 64bit 整数を生成
         for (int i = 0; i < SPEED_SAMPLES; ++i) {
             bench_data[i] = rng_speed();
         }
 
-        // ウォームアップ (キャッシュ・CPUクロックの安定化)
+        // ウォームアップ
         volatile uint64_t dummy = 0;
         for (int i = 0; i < 100000; ++i) {
             dummy += isqrt64(bench_data[i]);
@@ -103,16 +103,14 @@ int main() {
 
         // 本計測
         volatile uint64_t sink = 0;
-        uint64_t c_start = get_cpu_cycles();
-
+        const uint64_t c_start = get_cpu_cycles();
         for (int i = 0; i < SPEED_SAMPLES; ++i) {
             sink += isqrt64(bench_data[i]);
         }
 
-        uint64_t c_end = get_cpu_cycles();
-
-        uint64_t total_cycles = c_end - c_start;
-        double cycles_per_op = static_cast<double>(total_cycles) / SPEED_SAMPLES;
+        const uint64_t c_end = get_cpu_cycles();
+        const uint64_t total_cycles = c_end - c_start;
+        const double cycles_per_op = static_cast<double>(total_cycles) / SPEED_SAMPLES;
 
         std::cout << " Benchmark Results (isqrt64):" << std::endl;
         std::cout << "   - Data Size    : " << SPEED_SAMPLES << " elements (Random 64-bit)" << std::endl;
@@ -121,23 +119,24 @@ int main() {
         std::cout << "--------------------------------------------------" << std::endl;
     }
 
-    std::cout << "\n [sqrt128]" << std::endl;
+
+
+    std::cout << "\n [isqrt128]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
     for (auto reptime : {0, 1, 2}) {
-
         std::mt19937_64 rng_speed(13337 + reptime);
-        const int SPEED_SAMPLES = 100000000; // 1億回試行
+        const int SPEED_SAMPLES = 100000000;
         std::vector<uint128_t> bench_data(SPEED_SAMPLES);
 
-        // 各種ビット長（全領域）からランダムに 128bit 整数を生成
         for (int i = 0; i < SPEED_SAMPLES; ++i) {
-            uint64_t hi = rng_speed();
-            uint64_t lo = rng_speed();
+            const uint64_t hi = rng_speed();
+            const uint64_t lo = rng_speed();
+
             bench_data[i] = (static_cast<uint128_t>(hi) << 64) | lo;
         }
 
-        // ウォームアップ (キャッシュ・CPUクロックの安定化)
+        // ウォームアップ
         volatile uint64_t dummy = 0;
         for (int i = 0; i < 100000; ++i) {
             dummy += isqrt128(bench_data[i]);
@@ -145,16 +144,16 @@ int main() {
 
         // 本計測
         volatile uint64_t sink = 0;
-        uint64_t c_start = get_cpu_cycles();
+        const uint64_t c_start = get_cpu_cycles();
 
         for (int i = 0; i < SPEED_SAMPLES; ++i) {
             sink += isqrt128(bench_data[i]);
         }
 
-        uint64_t c_end = get_cpu_cycles();
+        const uint64_t c_end = get_cpu_cycles();
 
-        uint64_t total_cycles = c_end - c_start;
-        double cycles_per_op = static_cast<double>(total_cycles) / SPEED_SAMPLES;
+        const uint64_t total_cycles = c_end - c_start;
+        const double cycles_per_op = static_cast<double>(total_cycles) / SPEED_SAMPLES;
 
         std::cout << " Benchmark Results (isqrt128):" << std::endl;
         std::cout << "   - Data Size    : " << SPEED_SAMPLES << " elements (Random 128-bit)" << std::endl;
@@ -163,9 +162,8 @@ int main() {
         std::cout << "--------------------------------------------------" << std::endl;
     }
 
-    // -------------------------------------------------------------------------
-    // 3. is_perfect_square64 Benchmark (Random vs Pure Squares)
-    // -------------------------------------------------------------------------
+
+
     std::cout << "\n [is_perfect_square64]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
@@ -217,13 +215,12 @@ int main() {
         std::cout << " Benchmark Results (is_perfect_square64):" << std::endl;
         std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand  << " cycles / call (Hits: " << hits_rand  << ")" << std::endl;
         std::cout << "   - Pure Squares  (Worst-case)   : " << cycles_sq    << " cycles / call (Hits: " << hits_sq    << ")" << std::endl;
-        std::cout << "   - Non  Squares  (Best-case)    : " << cycles_nonsq << " cycles / call (Hits: " << hits_nonsq << ")" << std::endl;
+        std::cout << "   - Non-quadratic (Best-case)    : " << cycles_nonsq << " cycles / call (Hits: " << hits_nonsq << ")" << std::endl;
         std::cout << "--------------------------------------------------" << std::endl;
     }
 
-    // -------------------------------------------------------------------------
-    // 4. is_perfect_square128 Benchmark (Random vs Pure Squares)
-    // -------------------------------------------------------------------------
+
+
     std::cout << "\n [is_perfect_square128]" << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
 
@@ -281,10 +278,13 @@ int main() {
         std::cout << " Benchmark Results (is_perfect_square128):" << std::endl;
         std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand  << " cycles / call (Hits: " << hits_rand  << ")" << std::endl;
         std::cout << "   - Pure Squares  (Worst-case)   : " << cycles_sq    << " cycles / call (Hits: " << hits_sq    << ")" << std::endl;
-        std::cout << "   - Pure Squares  (Best-case)    : " << cycles_nonsq << " cycles / call (Hits: " << hits_nonsq << ")" << std::endl;
+        std::cout << "   - Non-quadratic (Best-case)    : " << cycles_nonsq << " cycles / call (Hits: " << hits_nonsq << ")" << std::endl;
         std::cout << "--------------------------------------------------" << std::endl;
     }
 
+
+
     std::cout << "\n[OK] Benchmark Completed Successfully!\n";
+
     return 0;
 }

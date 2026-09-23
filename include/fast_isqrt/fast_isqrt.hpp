@@ -11,6 +11,8 @@ namespace fast_isqrt {
 
 using uint128_t = unsigned __int128;
 
+// double sqrt
+
 [[nodiscard]] static inline uint64_t sqrt_u64(uint64_t n) noexcept {
     double x = static_cast<double>(n);
 #if defined(__AVX__) && (defined(__x86_64__) || defined(__amd64__))
@@ -22,6 +24,10 @@ using uint128_t = unsigned __int128;
 #endif
     return static_cast<uint64_t>(x);
 }
+
+
+
+//////////  64bit isqrt / with square / with remainder  //////////
 
 [[gnu::noinline, gnu::cold]] static uint64_t
 correct_isqrt64(uint64_t x) noexcept {
@@ -85,10 +91,17 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     return IsqrtRemainder64{x, remainder};
 }
 
+
+
+//////////  128bit isqrt / with square / with remainder  //////////
+
 [[nodiscard]] inline uint64_t isqrt128(uint128_t n) noexcept {
     const uint64_t hi = static_cast<uint64_t>(n >> 64);
-    if (hi == 0) [[unlikely]] {
-        return isqrt64(static_cast<uint64_t>(n));
+    if (hi == 0 || hi == UINT64_MAX) [[unlikely]] {
+        if (hi == 0) {
+            return isqrt64(static_cast<uint64_t>(n));
+        }
+        return UINT64_MAX;
     }
 
     const int a = __builtin_clzll(hi) >> 1;
@@ -116,10 +129,6 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
 
-    if (hi == UINT64_MAX) [[unlikely]] {
-        return UINT64_MAX;
-    }
-
     const uint128_t final_remainder =
         n - static_cast<uint128_t>(x) * x;
     return x - static_cast<uint64_t>(final_remainder >> 127);
@@ -145,9 +154,12 @@ handle_max_isqrt128_with_square() noexcept {
 
 [[nodiscard]] inline IsqrtSquare128 isqrt128_with_square(uint128_t n) noexcept {
     const uint64_t hi = static_cast<uint64_t>(n >> 64);
-    if (hi == 0) [[unlikely]] {
-        const auto [root, sq] = isqrt64_with_square(static_cast<uint64_t>(n));
-        return IsqrtSquare128{root, static_cast<uint128_t>(sq)};
+    if (hi == 0 || hi == UINT64_MAX) [[unlikely]] {
+        if (hi == 0) {
+            const auto [root, sq] = isqrt64_with_square(static_cast<uint64_t>(n));
+            return IsqrtSquare128{root, static_cast<uint128_t>(sq)};
+        }
+        return handle_max_isqrt128_with_square();
     }
 
     const int a = __builtin_clzll(hi) >> 1;
@@ -175,10 +187,6 @@ handle_max_isqrt128_with_square() noexcept {
         isqu;
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
-
-    if (hi == UINT64_MAX) [[unlikely]] {
-        return handle_max_isqrt128_with_square();
-    }
 
     const uint128_t sq = static_cast<uint128_t>(x) * x;
     const uint128_t final_remainder = n - sq;
@@ -210,9 +218,12 @@ handle_max_isqrt128_with_remainder(uint128_t n) noexcept {
 
 [[nodiscard]] inline IsqrtRemainder128 isqrt128_with_remainder(uint128_t n) noexcept {
     const uint64_t hi = static_cast<uint64_t>(n >> 64);
-    if (hi == 0) [[unlikely]] {
-        const auto [root, rem] = isqrt64_with_remainder(static_cast<uint64_t>(n));
-        return IsqrtRemainder128{root, static_cast<uint128_t>(rem)};
+    if (hi == 0 || hi == UINT64_MAX) [[unlikely]] {
+        if (hi == 0) {
+            const auto [root, rem] = isqrt64_with_remainder(static_cast<uint64_t>(n));
+            return IsqrtRemainder128{root, static_cast<uint128_t>(rem)};
+        }
+        return handle_max_isqrt128_with_remainder(n);
     }
 
     const int a = __builtin_clzll(hi) >> 1;
@@ -241,10 +252,6 @@ handle_max_isqrt128_with_remainder(uint128_t n) noexcept {
     const uint64_t base = isqu << (32 - a);
     const uint64_t x = base + (quotient >> a);
 
-    if (hi == UINT64_MAX) [[unlikely]] {
-        return handle_max_isqrt128_with_remainder(n);
-    }
-
     const uint128_t sq = static_cast<uint128_t>(x) * x;
     const uint128_t final_remainder = n - sq;
 
@@ -254,6 +261,10 @@ handle_max_isqrt128_with_remainder(uint128_t n) noexcept {
 
     return IsqrtRemainder128{x, final_remainder};
 }
+
+
+
+//////////  is_perfect_square  //////////
 
 template <uint64_t Mod>
 [[nodiscard]] constexpr uint64_t generate_sq_mod_mask() noexcept {
@@ -272,8 +283,8 @@ template <uint64_t Mod>
         return false;
     }
 
-    const auto [r, sq] = isqrt64_with_square(n);
-    return sq == n;
+    const uint64_t r = sqrt_u64(n);
+    return r * r == n;
 }
 
 // 128-bit 平方判定
@@ -285,8 +296,40 @@ template <uint64_t Mod>
     }
 
     // 128-bit での最終検証
-    const uint128_t r = isqrt128(n);
-    return r * r == n;
+        const uint64_t hi = static_cast<uint64_t>(n >> 64);
+    if (hi == 0 || hi == UINT64_MAX) [[unlikely]] {
+        if (hi == 0) {
+            const uint64_t r = sqrt_u64(static_cast<uint64_t>(n));
+            return r * r == n;
+        }
+        return static_cast<uint128_t>(UINT64_MAX) * UINT64_MAX == n;
+    }
+
+    const int a = __builtin_clzll(hi) >> 1;
+
+    //x86限定で無駄なassemblyを無理やり吐かないようにする
+#if defined(__x86_64__) || defined(__amd64__)
+    const unsigned shift = static_cast<unsigned>(a << 1);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
+    uint64_t u = hi;
+    __asm__("shldq %%cl, %1, %0"
+        : "+r"(u)
+        : "r"(n_lo), "c"(shift)
+        : "cc");
+    const uint64_t scaled_lo = n_lo << shift;
+#else
+    const uint128_t scaled_n = n << (a << 1);
+    const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const uint64_t scaled_lo = static_cast<uint64_t>(scaled_n);
+#endif
+
+    const auto [isqu, remainder] = isqrt64_with_remainder(u);
+
+    const uint64_t quotient =
+        ((remainder << 31) | (scaled_lo >> 33)) / isqu;
+    const uint64_t base = isqu << (32 - a);
+    const uint64_t x = base + (quotient >> a);
+    return static_cast<uint128_t>(x) * x == n;
 }
 
 } // namespace fast_isqrt
