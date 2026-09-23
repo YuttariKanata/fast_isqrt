@@ -283,8 +283,8 @@ template <uint64_t Mod>
         return false;
     }
 
-    const auto [r, sq] = isqrt64_with_square(n);
-    return sq == n;
+    const uint64_t r = sqrt_u64(n);
+    return r*r == n;
 }
 
 // 128-bit 平方判定

@@ -298,7 +298,7 @@ int main() {
 
     std::cout << "[6] UINT64_MAX, LIMIT_104, UINT128_MAX Neighborhood [MAX-100'000'000, MAX]..." << std::endl;
     {
-        constexpr uint128_t RADIUS = 100'000'000;
+        constexpr uint128_t RADIUS = 200'000'000;
 
         test_range(U128MAX - RADIUS, U128MAX);
         test_range(U64MAX_128 - RADIUS, U64MAX_128);
@@ -307,7 +307,7 @@ int main() {
 
     std::cout << "[7] k^2 Neighborhoods (k = UINT64_MAX - 0..99, R = 1'000'000)..." << std::endl;
     {
-        constexpr uint64_t K_COUNT = 100;
+        constexpr uint64_t K_COUNT = 200;
         constexpr uint128_t RADIUS = 1'000'000;
 
         for (uint64_t i = 0; i < K_COUNT; ++i) {
