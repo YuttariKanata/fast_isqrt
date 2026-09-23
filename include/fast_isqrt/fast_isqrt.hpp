@@ -25,18 +25,6 @@ using uint128_t = unsigned __int128;
     return static_cast<uint64_t>(x);
 }
 
-[[nodiscard]] static inline uint64_t sqrt_u128(uint128_t n) noexcept {    
-    double x = static_cast<double>(n);
-#if defined(__AVX__) && (defined(__x86_64__) || defined(__amd64__))
-    __asm__("vsqrtsd %0, %0, %0" : "+x"(x));
-#elif defined(__SSE2__) && (defined(__x86_64__) || defined(__amd64__))
-    __asm__("sqrtsd %0, %0" : "+x"(x));
-#else
-    x = __builtin_sqrt(x);
-#endif
-    return static_cast<uint64_t>(x);
-}
-
 
 
 //////////  64bit isqrt / with square / with remainder  //////////
@@ -101,82 +89,6 @@ isqrt64_with_remainder(uint64_t n) noexcept {
     }
 
     return IsqrtRemainder64{x, remainder};
-}
-
-
-
-//////////  104bit isqrt n <= LIMIT_104 / with square / with remainder  //////////
-
-constexpr uint128_t LIMIT_52  = static_cast<uint128_t>(UINT32_MAX)+100; //((static_cast<uint128_t>(1) << 52)/3)-2;
-constexpr uint128_t LIMIT_104 = LIMIT_52 * (LIMIT_52 + 2);
-
-[[gnu::noinline, gnu::cold]] static uint64_t
-correct_isqrt104(uint64_t x) noexcept {
-    return x - 1;
-}
-
-[[nodiscard]] inline uint64_t isqrt104(uint128_t n) noexcept {
-    const uint64_t hi = static_cast<uint64_t>(n >> 64);
-    if (hi == 0) [[unlikely]] {
-        return isqrt64(static_cast<uint64_t>(n));
-    }
-
-    const int a = (__builtin_clzll(hi)+1) >> 1;
-    const uint64_t x = sqrt_u64(static_cast<uint64_t>(n >> (a << 1))) << a;
-    const uint64_t remainder = static_cast<uint64_t>(n) - x * x;
-
-    if (remainder >> 63) [[unlikely]] {
-        return correct_isqrt104(x);
-    }
-
-    return x;
-}
-
-struct alignas(16) IsqrtSquare104 {
-    uint64_t root;
-    uint128_t sq;
-};
-
-[[gnu::noinline, gnu::cold]] static IsqrtSquare104
-correct_isqrt104_with_square(uint64_t x, uint128_t sq) noexcept {
-    // isqrt104ではxはLIMIT_52以下のはず
-    sq -= (x << 1) - 1;
-    return IsqrtSquare104{x - 1, sq};
-}
-
-[[nodiscard]] inline IsqrtSquare104 isqrt104_with_square(uint128_t n) noexcept {
-    const uint64_t x = sqrt_u128(n);
-    const uint128_t sq = static_cast<uint128_t>(x) * x;
-
-    if ((n - sq) >> 127) [[unlikely]] {
-        return correct_isqrt104_with_square(x, sq);
-    }
-
-    return IsqrtSquare104{x, sq};
-}
-
-struct alignas(16) IsqrtRemainder104 {
-    uint64_t root;
-    uint64_t remainder;
-};
-
-[[gnu::noinline, gnu::cold]] static IsqrtRemainder104
-correct_isqrt104_with_remainder(uint64_t x, uint64_t remainder) noexcept {
-    // remainderは最大でもLIMIT_52*2以下のはず
-    remainder += (x << 1) - 1;
-    return IsqrtRemainder104{x - 1, remainder};
-}
-
-[[nodiscard]] static inline IsqrtRemainder104
-isqrt104_with_remainder(uint128_t n) noexcept {
-    const uint64_t x = sqrt_u128(n);
-    const uint64_t remainder = static_cast<uint64_t>(n) - x * x;
-
-    if (remainder >> 63) [[unlikely]] {
-        return correct_isqrt104_with_remainder(x, remainder);
-    }
-
-    return IsqrtRemainder104{x, remainder};
 }
 
 
