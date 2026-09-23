@@ -284,7 +284,7 @@ template <uint64_t Mod>
     }
 
     const uint64_t r = sqrt_u64(n);
-    return r*r == n;
+    return r * r == n;
 }
 
 // 128-bit 平方判定
@@ -296,8 +296,40 @@ template <uint64_t Mod>
     }
 
     // 128-bit での最終検証
-    const uint128_t r = isqrt128(n);
-    return r * r == n;
+        const uint64_t hi = static_cast<uint64_t>(n >> 64);
+    if (hi == 0 || hi == UINT64_MAX) [[unlikely]] {
+        if (hi == 0) {
+            const uint64_t r = sqrt_u64(static_cast<uint64_t>(n));
+            return r * r == n;
+        }
+        return static_cast<uint128_t>(UINT64_MAX) * UINT64_MAX == n;
+    }
+
+    const int a = __builtin_clzll(hi) >> 1;
+
+    //x86限定で無駄なassemblyを無理やり吐かないようにする
+#if defined(__x86_64__) || defined(__amd64__)
+    const unsigned shift = static_cast<unsigned>(a << 1);
+    const uint64_t n_lo = static_cast<uint64_t>(n);
+    uint64_t u = hi;
+    __asm__("shldq %%cl, %1, %0"
+        : "+r"(u)
+        : "r"(n_lo), "c"(shift)
+        : "cc");
+    const uint64_t scaled_lo = n_lo << shift;
+#else
+    const uint128_t scaled_n = n << (a << 1);
+    const uint64_t u = static_cast<uint64_t>(scaled_n >> 64);
+    const uint64_t scaled_lo = static_cast<uint64_t>(scaled_n);
+#endif
+
+    const auto [isqu, remainder] = isqrt64_with_remainder(u);
+
+    const uint64_t quotient =
+        ((remainder << 31) | (scaled_lo >> 33)) / isqu;
+    const uint64_t base = isqu << (32 - a);
+    const uint64_t x = base + (quotient >> a);
+    return static_cast<uint128_t>(x) * x == n;
 }
 
 } // namespace fast_isqrt
