@@ -4,6 +4,7 @@
 #include <vector>
 #include <random>
 #include <chrono>
+#include <array>
 #include <fast_isqrt/fast_isqrt.hpp>
 
 using namespace fast_isqrt;
