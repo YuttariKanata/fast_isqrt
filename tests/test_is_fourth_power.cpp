@@ -20,33 +20,36 @@ using namespace fast_isqrt;
 
 [[gnu::always_inline]] inline void test_one(uint128_t n) {
     const uint64_t r = isqrt128(n);
-    const bool expected = static_cast<uint128_t>(r) * r == n;
-    const bool actual128 = is_perfect_square128(n);
+    const uint64_t r2 = isqrt64(r);
+    const bool expected = (static_cast<uint128_t>(r) * r == n) && (r2 * r2 == r);
+    const bool actual128 = is_perfect_fourth_power128(n);
 
     if (actual128 != expected) [[unlikely]] {
         std::cerr << std::format(
-            "FAILED: is_perfect_square128(n)\n"
+            "FAILED: is_perfect_fourth_power128(n)\n"
             "  n        = 0x{:016x}{:016x}\n"
             "  r        =                 0x{:016x}\n"
+            "  r2       =                 0x{:016x}\n"
             "  expected = {}, actual   = {}",
-            static_cast<uint64_t>(n >> 64), static_cast<uint64_t>(n), r,
+            static_cast<uint64_t>(n >> 64), static_cast<uint64_t>(n), r, r2,
             expected, actual128
         ) << std::endl;
         std::exit(1);
     }
 
-    // 64-bit に収まる場合だけ is_perfect_square64 も検証
+    // 64-bit に収まる場合だけ is_perfect_fourth_power64 も検証
     if (n <= UINT64_MAX) {
         const uint64_t n64 = static_cast<uint64_t>(n);
-        const bool actual64 = is_perfect_square64(n64);
+        const bool actual64 = is_perfect_fourth_power64(n64);
 
         if (actual64 != expected) [[unlikely]] {
             std::cerr << std::format(
-                "FAILED: is_perfect_square64(n)\n"
+                "FAILED: is_perfect_fourth_power64(n)\n"
                 "  n                        = 0x{:016x}\n"
                 "  r                        = 0x{:016x}\n"
+                "  r2                       = 0x{:016x}\n"
                 "  expected = {}, actual   = {}",
-                n64, r,
+                n64, r, r2,
                 expected, actual64
             ) << std::endl;
             std::exit(1);
@@ -55,34 +58,36 @@ using namespace fast_isqrt;
 }
 
 [[gnu::always_inline]] inline void test_one(uint128_t n, bool expected) {
-    const bool actual128 = is_perfect_square128(n);
+    const uint64_t r = isqrt128(n);
+    const uint64_t r2 = isqrt64(r);
+    const bool actual128 = is_perfect_fourth_power128(n);
 
     if (actual128 != expected) [[unlikely]] {
-        const uint64_t r = isqrt128(n);
         std::cerr << std::format(
-            "FAILED: is_perfect_square128(n)\n"
+            "FAILED: is_perfect_fourth_power128(n)\n"
             "  n        = 0x{:016x}{:016x}\n"
             "  r        =                 0x{:016x}\n"
+            "  r2       =                 0x{:016x}\n"
             "  expected = {}, actual   = {}",
-            static_cast<uint64_t>(n >> 64), static_cast<uint64_t>(n), r,
+            static_cast<uint64_t>(n >> 64), static_cast<uint64_t>(n), r, r2,
             expected, actual128
         ) << std::endl;
         std::exit(1);
     }
 
-    // 64-bit に収まる場合だけ is_perfect_square64 も検証
+    // 64-bit に収まる場合だけ is_perfect_fourth_power64 も検証
     if (n <= UINT64_MAX) {
         const uint64_t n64 = static_cast<uint64_t>(n);
-        const bool actual64 = is_perfect_square64(n64);
+        const bool actual64 = is_perfect_fourth_power64(n64);
 
         if (actual64 != expected) [[unlikely]] {
-            const uint64_t r = isqrt128(n);
             std::cerr << std::format(
-                "FAILED: is_perfect_square64(n)\n"
+                "FAILED: is_perfect_fourth_power64(n)\n"
                 "  n                        = 0x{:016x}\n"
                 "  r                        = 0x{:016x}\n"
+                "  r2                       = 0x{:016x}\n"
                 "  expected = {}, actual   = {}",
-                n64, r,
+                n64, r, r2,
                 expected, actual64
             ) << std::endl;
             std::exit(1);
@@ -90,26 +95,30 @@ using namespace fast_isqrt;
     }
 }
 
-[[gnu::always_inline]] inline void test_square(uint64_t r) {
-    const uint128_t n = static_cast<uint128_t>(r) * r;
+[[gnu::always_inline]] inline void test_fourth_power(uint64_t r) {
+    assert(r <= static_cast<uint64_t>(UINT32_MAX));
+    const uint64_t r2 = r * r;
+    const uint128_t n = static_cast<uint128_t>(r2) * r2;
     test_one(n, true);
 }
 
 
-[[gnu::always_inline]] inline void test_square_neighborhood(uint64_t r) {
+[[gnu::always_inline]] inline void test_fourth_power_neighborhood(uint64_t r) {
     constexpr uint128_t UINT128_MAX = std::numeric_limits<uint128_t>::max();
-    const uint128_t sq = static_cast<uint128_t>(r) * r;
+    assert(r <= static_cast<uint64_t>(UINT32_MAX));
+    const uint64_t r2 = r * r;
+    const uint128_t quad = static_cast<uint128_t>(r2) * r2;
 
-    test_one(sq, true);
+    test_one(quad, true);
 
     if (r) [[likely]] {
-        const uint128_t n1 = sq - 1;
+        const uint128_t n1 = quad - 1;
         test_one(n1, n1==0);
     } else {
         test_one(UINT128_MAX, false);
     }
     
-    const uint128_t n2 = sq + 1;
+    const uint128_t n2 = quad + 1;
     test_one(n2, n2==1);
 }
 
@@ -154,8 +163,9 @@ void test_range(uint128_t lo, uint128_t hi) {
     }
 }
 
-void test_range_square_neighborhood(uint64_t lo64, uint64_t hi64) {
+void test_range_fourth_power_neighborhood(uint64_t lo64, uint64_t hi64) {
     if (lo64 > hi64) [[unlikely]] { return; }
+    assert(hi64  <= static_cast<uint64_t>(UINT32_MAX));
     const uint128_t lo = static_cast<uint128_t>(lo64);
     const uint128_t hi = static_cast<uint128_t>(hi64);
 
@@ -179,7 +189,7 @@ void test_range_square_neighborhood(uint64_t lo64, uint64_t hi64) {
         workers.emplace_back(
             [begin, end]() {
                 for (uint128_t r = begin;; ++r) {
-                    test_square_neighborhood(r);
+                    test_fourth_power_neighborhood(r);
 
                     if (r == end) [[unlikely]] {
                         break;
@@ -219,85 +229,41 @@ int main() {
     test_one(U128MAX - 1);
     test_one(U128MAX);
 
-    test_square_neighborhood(0);
-    test_square_neighborhood(1ULL << 16);
-    test_square_neighborhood((1ULL << 16) - 1);
-    test_square_neighborhood(1ULL << 32);
-    test_square_neighborhood((1ULL << 32) - 1);
-    test_square_neighborhood(UINT64_MAX);
+    test_fourth_power_neighborhood(0);
+    test_fourth_power_neighborhood(1);
+    test_fourth_power_neighborhood(static_cast<uint64_t>(UINT32_MAX)-1);
+    test_fourth_power_neighborhood(static_cast<uint64_t>(UINT32_MAX));
 
 
 
-    std::cout << "[2] Exhaustive 64-bit Squares..." << std::endl;
+    std::cout << "[2] All 2^32 Perfect Quads Off-By-One Test (x = 0 .. 2^32 - 1)" << std::endl;
 
-    constexpr uint64_t MAX_R = 10'000'000;
-    test_range_square_neighborhood(0ULL, MAX_R);
-
-
-
-    constexpr int num_tests = 100'000'000ULL;
-    std::cout << "[3] Random 64-bit Stress Test (100'000'000 iterations)" << std::endl;
-
-    for (int i = 0; i < num_tests; ++i) {
-        const uint64_t r = rng() & static_cast<uint64_t>(UINT32_MAX);
-
-        test_square_neighborhood(r);
-
-        if (((i + 1) & 0x7FFFFF) == 0) {
-            std::cout << std::format("  Square neighborhood test: {:.2f}% passed.", static_cast<double>(i + 1) / num_tests * 100.0) << std::endl;
-        }
-    }
+    test_range_fourth_power_neighborhood(0, static_cast<uint64_t>(UINT32_MAX));
 
 
 
-    std::cout << "[4] Random 128-bit Stress Test (100'000'000 iterations)" << std::endl;
-
-    for (int i = 0; i < num_tests; ++i) {
-        const uint64_t r = rng();
-
-        test_square_neighborhood(r);
-
-        if (((i + 1) & 0x7FFFFF) == 0) {
-            std::cout << std::format("  Square neighborhood test: {:.2f}% passed.", static_cast<double>(i + 1) / num_tests * 100.0) << std::endl;
-        }
-    }
-
-
-
-    constexpr uint64_t num_squares = 200;
+    constexpr uint64_t num_quads = 200;
     constexpr uint64_t radius = 1000000;
-    std::cout << std::format("[5] Random Square Neighborhood (num_squares = {}, radius = ±{})",
-                            num_squares, radius) << std::endl;
+    std::cout << std::format("[3] Random Quad Neighborhood (num_quads = {}, radius = ±{})",
+                            num_quads, radius) << std::endl;
 
-    for (size_t i = 0; i < num_squares; ++i) {
-        const uint64_t r = rng();
-        const uint128_t sq = static_cast<uint128_t>(r) * r;
+    for (size_t i = 0; i < num_quads; ++i) {
+        const uint64_t r = rng() & static_cast<uint64_t>(UINT32_MAX);
+        const uint64_t r2 = r * r;
+        const uint128_t quad = static_cast<uint128_t>(r2) * r2;
 
         const uint128_t radius128 = static_cast<uint128_t>(radius);
-        const uint128_t start = (sq >= radius128) ? sq - radius128 : uint128_t(0);
-        const uint128_t end = (U128MAX - sq >= radius128) ? sq + radius128 : U128MAX;
+        const uint128_t start = (quad >= radius128) ? quad - radius128 : uint128_t(0);
+        const uint128_t end = (U128MAX - quad >= radius128) ? quad + radius128 : U128MAX;
 
         // 範囲内の全整数を検証
         test_range(start, end);
 
-        if ((i + 1) % 20 == 0 || i + 1 == num_squares) {
-            std::cout << std::format("  Progress: {} / {} squares checked.",
-                                    i + 1, num_squares) << std::endl;
+        if ((i + 1) % 20 == 0 || i + 1 == num_quads) {
+            std::cout << std::format("  Progress: {} / {} quads checked.",
+                                    i + 1, num_quads) << std::endl;
         }
     }
-
-
-
-    std::cout << "[6] All 2^32 Perfect Squares Off-By-One Test (x = 0 .. 2^32 - 1)" << std::endl;
-
-    constexpr uint64_t TOTAL_X = 1ULL << 32;
-
-    test_one(0ULL, true);
-    test_one(1ULL, true);
-    test_one(2ULL, false);
-    test_one(UINT64_MAX, false);
-
-    test_range_square_neighborhood(2, TOTAL_X);
 
     std::cout << "\n[PASS] ALL TESTS PASSED SUCCESSFULLY!" << std::endl;
 
