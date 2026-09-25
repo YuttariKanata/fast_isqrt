@@ -373,10 +373,10 @@ template <uint64_t Mod>
         return false;
     }
 
-    constexpr uint64_t quad_mod63_mask = generate_quad_mod_mask<45>();
-    if ((quad_mod63_mask & (1ULL << (n % 45))) == 0) [[likely]] {
-        return false;
-    }
+    // constexpr uint64_t quad_mod63_mask = generate_quad_mod_mask<45>();
+    // if ((quad_mod63_mask & (1ULL << (n % 45))) == 0) [[likely]] {
+    //     return false;
+    // }
 
     const uint64_t r = sqrt_u64(n);
     if (r * r != n) [[likely]] {
@@ -405,10 +405,10 @@ correct_is_perfect_fourth_power128(uint128_t x, uint64_t hi) noexcept {
         return false;
     }
 
-    // constexpr uint64_t quad_mod63_mask = generate_quad_mod_mask<45>();
-    // if ((quad_mod63_mask & (1ULL << (n % 45))) == 0) [[likely]] {
-    //     return false;
-    // }
+    constexpr uint64_t quad_mod45_mask = generate_quad_mod_mask<45>();
+    if ((quad_mod45_mask & (1ULL << (n % 45))) == 0) [[likely]] {
+        return false;
+    }
 
     // 128-bit での最終検証
     const int a = __builtin_clzll(hi) >> 1;
