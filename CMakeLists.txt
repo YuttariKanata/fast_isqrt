@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.25)
 project(fast_isqrt LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 26)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -34,6 +34,7 @@ if(BUILD_TESTS)
     set(TEST_TARGETS
         test_fast_isqrt
         test_is_perfect_square
+        test_is_fourth_power
     )
 
     foreach(target ${TEST_TARGETS})

@@ -4,6 +4,8 @@
 #include <vector>
 #include <random>
 #include <chrono>
+#include <cstddef>
+#include <array>
 #include <fast_isqrt/fast_isqrt.hpp>
 
 using namespace fast_isqrt;
@@ -37,45 +39,77 @@ static inline uint64_t get_cpu_cycles(void) {
 #endif
 }
 
-struct Mod64NonSquares {
-    static constexpr std::size_t total_count = 64;
-    
-    // 平方剰余の個数を事前に計算
-    static constexpr std::size_t num_squares = []() {
-        std::array<bool, total_count> is_sq{};
+template <std::size_t Mod>
+struct ModNonSquares {
+    static_assert(Mod <= UINT8_MAX + 1);
+
+    struct Data {
+        std::array<uint8_t, Mod> values{};
         std::size_t count = 0;
-        for (std::size_t i = 0; i < total_count; ++i) {
-            std::size_t rem = (i * i) % total_count;
-            if (!is_sq[rem]) {
-                is_sq[rem] = true;
-                ++count;
+
+        constexpr std::size_t size() const noexcept { return count; }
+
+        constexpr uint8_t operator[](std::size_t i) const noexcept { return values[i]; }
+    };
+
+    static constexpr Data data = []() {
+        Data result{};
+        std::array<bool, Mod> is_square{};
+
+        for (std::size_t x = 0; x < Mod; ++x) {
+            const std::size_t r = (x * x) % Mod;
+            is_square[r] = true;
+        }
+
+        for (std::size_t r = 0; r < Mod; ++r) {
+            if (!is_square[r]) {
+                result.values[result.count++] = static_cast<uint8_t>(r);
             }
         }
-        return count;
-    }();
 
-    // 非平方剰余の個数 (64 - 平方剰余の個数)
-    static constexpr std::size_t count = total_count - num_squares;
-
-    // 非平方剰余テーブル本体
-    static constexpr std::array<uint8_t, count> table = []() {
-        std::array<bool, total_count> is_sq{};
-        for (std::size_t i = 0; i < total_count; ++i) {
-            is_sq[(i * i) % total_count] = true;
-        }
-
-        std::array<uint8_t, count> non_sq{};
-        std::size_t idx = 0;
-        for (std::size_t i = 0; i < total_count; ++i) {
-            if (!is_sq[i]) {
-                non_sq[idx++] = static_cast<uint8_t>(i);
-            }
-        }
-        return non_sq;
+        return result;
     }();
 };
 
-constexpr auto NON_SQUARE_MOD64 = Mod64NonSquares::table;
+
+template <std::size_t Mod>
+struct ModNonQuads {
+    static_assert(Mod <= UINT8_MAX + 1);
+
+    struct Data {
+        std::array<uint8_t, Mod> values{};
+        std::size_t count = 0;
+
+        constexpr std::size_t size() const noexcept { return count; }
+
+        constexpr uint8_t operator[](std::size_t i) const noexcept { return values[i]; }
+    };
+
+    static constexpr Data data = []() {
+        Data result{};
+        std::array<bool, Mod> is_quad{};
+
+        for (std::size_t x = 0; x < Mod; ++x) {
+            const std::size_t x2 = (x * x) % Mod;
+            const std::size_t x4 = (x2 * x2) % Mod;
+
+            is_quad[x4] = true;
+        }
+
+        for (std::size_t r = 0; r < Mod; ++r) {
+            if (!is_quad[r]) {
+                result.values[result.count++] = static_cast<uint8_t>(r);
+            }
+        }
+
+        return result;
+    }();
+};
+
+constexpr auto NON_SQUARE_MOD64 = ModNonSquares<64>::data;
+constexpr auto NON_QUAD_MOD64 = ModNonQuads<64>::data;
+
+
 
 int main() {
 
@@ -279,6 +313,128 @@ int main() {
         std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand  << " cycles / call (Hits: " << hits_rand  << ")" << std::endl;
         std::cout << "   - Pure Squares  (Worst-case)   : " << cycles_sq    << " cycles / call (Hits: " << hits_sq    << ")" << std::endl;
         std::cout << "   - Non-quadratic (Best-case)    : " << cycles_nonsq << " cycles / call (Hits: " << hits_nonsq << ")" << std::endl;
+        std::cout << "--------------------------------------------------" << std::endl;
+    }
+
+
+
+    std::cout << "\n [is_perfect_fourth_power64]" << std::endl;
+    std::cout << "--------------------------------------------------" << std::endl;
+
+    for (auto reptime : {0, 1, 2}) {
+
+        std::mt19937_64 rng(13337 + reptime);
+        const int SPEED_SAMPLES = 100000000;
+        std::vector<uint64_t> random_data(SPEED_SAMPLES);
+        std::vector<uint64_t> quad_data(SPEED_SAMPLES);
+        std::vector<uint64_t> nonquad_data(SPEED_SAMPLES);
+
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            random_data[i] = rng();
+            uint64_t r = rng() & UINT16_MAX;
+            uint64_t r2 = r * r;
+            quad_data[i] = r2 * r2;
+
+            uint8_t non_quad = NON_QUAD_MOD64[rng() % NON_QUAD_MOD64.size()];
+            nonquad_data[i] = (rng() & ~0x3FULL) | non_quad;
+        }
+
+        // Random データ計測 (Early Reject 性能)
+        volatile uint64_t hits_rand = 0;
+        uint64_t c0 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_rand += is_perfect_fourth_power64(random_data[i]);
+        }
+        uint64_t c1 = get_cpu_cycles();
+
+        // Pure Quad データ計測 (Worst-case 性能)
+        volatile uint64_t hits_quad = 0;
+        uint64_t c2 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_quad += is_perfect_fourth_power64(quad_data[i]);
+        }
+        uint64_t c3 = get_cpu_cycles();
+
+        // Non Quad データ計測 (Best-case 性能)
+        volatile uint64_t hits_nonquad = 0;
+        uint64_t c4 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_nonquad += is_perfect_fourth_power64(nonquad_data[i]);
+        }
+        uint64_t c5 = get_cpu_cycles();
+
+        double cycles_rand    = static_cast<double>(c1 - c0) / SPEED_SAMPLES;
+        double cycles_quad    = static_cast<double>(c3 - c2) / SPEED_SAMPLES;
+        double cycles_nonquad = static_cast<double>(c5 - c4) / SPEED_SAMPLES;
+
+        std::cout << " Benchmark Results (is_perfect_fourth_power64):" << std::endl;
+        std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand    << " cycles / call (Hits: " << hits_rand    << ")" << std::endl;
+        std::cout << "   - Pure Quads  (Worst-case)     : " << cycles_quad    << " cycles / call (Hits: " << hits_quad    << ")" << std::endl;
+        std::cout << "   - Non-quadratic (Best-case)    : " << cycles_nonquad << " cycles / call (Hits: " << hits_nonquad << ")" << std::endl;
+        std::cout << "--------------------------------------------------" << std::endl;
+    }
+
+
+
+    std::cout << "\n [is_perfect_fourth_power128]" << std::endl;
+    std::cout << "--------------------------------------------------" << std::endl;
+
+    for (auto reptime : {0, 1, 2}) {
+
+        std::mt19937_64 rng(13337 + reptime);
+        const int SPEED_SAMPLES = 100000000;
+        std::vector<uint128_t> random_data(SPEED_SAMPLES);
+        std::vector<uint128_t> quad_data(SPEED_SAMPLES);
+        std::vector<uint128_t> nonquad_data(SPEED_SAMPLES);
+
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            uint64_t hi = rng();
+            uint64_t lo = rng();
+            random_data[i] = (static_cast<uint128_t>(hi) << 64) | lo;
+
+            uint128_t r = static_cast<uint128_t>(rng() & static_cast<uint64_t>(UINT32_MAX)); // 64bit r
+            uint128_t r2 = r * r;
+            quad_data[i] = r2 * r2;
+
+            hi = rng();
+            lo = rng();
+            uint8_t non_quad1 = NON_QUAD_MOD64[rng() % NON_QUAD_MOD64.size()];
+            lo = (lo & ~0x3FULL) | non_quad1;
+            nonquad_data[i] = (static_cast<uint128_t>(hi) << 64) | lo;
+        }
+
+        // Random データ計測 (Early Reject 性能)
+        volatile uint64_t hits_rand = 0;
+        uint64_t c0 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_rand += is_perfect_fourth_power128(random_data[i]);
+        }
+        uint64_t c1 = get_cpu_cycles();
+
+        // Pure Quad データ計測 (Worst-case 性能)
+        volatile uint64_t hits_quad = 0;
+        uint64_t c2 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_quad += is_perfect_fourth_power128(quad_data[i]);
+        }
+        uint64_t c3 = get_cpu_cycles();
+
+        // Non Quad データ計測 (Best-case 性能)
+        volatile uint64_t hits_nonquad = 0;
+        uint64_t c4 = get_cpu_cycles();
+        for (int i = 0; i < SPEED_SAMPLES; ++i) {
+            hits_nonquad += is_perfect_fourth_power128(nonquad_data[i]);
+        }
+        uint64_t c5 = get_cpu_cycles();
+
+        double cycles_rand    = static_cast<double>(c1 - c0) / SPEED_SAMPLES;
+        double cycles_quad    = static_cast<double>(c3 - c2) / SPEED_SAMPLES;
+        double cycles_nonquad = static_cast<double>(c5 - c4) / SPEED_SAMPLES;
+
+        std::cout << " Benchmark Results (is_perfect_fourth_power128):" << std::endl;
+        std::cout << "   - Random Inputs (Early Reject) : " << cycles_rand    << " cycles / call (Hits: " << hits_rand   << ")" << std::endl;
+        std::cout << "   - Pure Quads    (Worst-case)   : " << cycles_quad    << " cycles / call (Hits: " << hits_quad    << ")" << std::endl;
+        std::cout << "   - Non-quadratic (Best-case)    : " << cycles_nonquad << " cycles / call (Hits: " << hits_nonquad << ")" << std::endl;
         std::cout << "--------------------------------------------------" << std::endl;
     }
 

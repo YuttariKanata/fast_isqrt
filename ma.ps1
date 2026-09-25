@@ -94,4 +94,4 @@ if ($Bench) {
     }
 }
 
-Write-Host "`n[✓] Done!" -ForegroundColor Cyan
+Write-Host "`n[OK] Done!" -ForegroundColor Cyan
