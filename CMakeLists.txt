@@ -34,6 +34,7 @@ if(BUILD_TESTS)
     set(TEST_TARGETS
         test_fast_isqrt
         test_is_perfect_square
+        test_is_fourth_power
     )
 
     foreach(target ${TEST_TARGETS})

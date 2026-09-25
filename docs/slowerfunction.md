@@ -38,3 +38,16 @@
 ```
 
 これは残念ながらそこまで高速ではありません。
+
+## is_perfect_fourth_power
+
+### Mod63
+
+| 対象 (ビット幅) | テストケース | Mod63 なし (平均) | Mod63 あり (平均) | 差分 (あり－なし) |
+| --- | --- | --- | --- | --- |
+| fourth_power64 | Random Inputs (Early Reject) | 3.9674 | 4.0289 | +0.0615 |
+| | Pure Quads (Worst-case) | 13.7546 | 14.8631 | +1.1085 |
+| | Non-quadratic (Best-case) | 1.6784 | 1.7651 | +0.0867 |
+| fourth_power128 | Random Inputs (Early Reject) | 5.9250 | 5.2354 | -0.6896 |
+| | Pure Quads (Worst-case) | 41.4765 | 45.7876 | +4.3111 |
+| | Non-quadratic (Best-case) | 2.5859 | 2.4903 | -0.0956 |
